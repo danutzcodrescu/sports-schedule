@@ -1,5 +1,10 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "singleQuote": true,
-  "ignorePatterns": ["src/client/routeTree.gen.ts", "worker-configuration.d.ts", "pnpm-lock.yaml"]
+  "ignorePatterns": [
+    "src/client/routeTree.gen.ts",
+    "src/worker/db/auth-schema.ts",
+    "worker-configuration.d.ts",
+    "pnpm-lock.yaml"
+  ]
 }

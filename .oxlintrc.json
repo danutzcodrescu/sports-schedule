@@ -8,5 +8,10 @@
   "env": {
     "builtin": true
   },
-  "ignorePatterns": ["dist/**", "src/client/routeTree.gen.ts", "worker-configuration.d.ts"]
+  "ignorePatterns": [
+    "dist/**",
+    "src/client/routeTree.gen.ts",
+    "src/worker/db/auth-schema.ts",
+    "worker-configuration.d.ts"
+  ]
 }
