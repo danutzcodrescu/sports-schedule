@@ -1,1 +1,1 @@
-DROP TABLE `teams`;
+DROP TABLE IF EXISTS `teams`;

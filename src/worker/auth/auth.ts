@@ -1,14 +1,14 @@
-import { betterAuth } from 'better-auth';
-import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { createDb } from '../db';
-import * as authSchema from '../db/auth-schema';
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { createDb } from "../db";
+import * as authSchema from "../db/auth-schema";
 
 export function createAuth(env: CloudflareBindings) {
   return betterAuth({
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     database: drizzleAdapter(createDb(env.DB), {
-      provider: 'sqlite',
+      provider: "sqlite",
       schema: authSchema,
     }),
     emailAndPassword: {

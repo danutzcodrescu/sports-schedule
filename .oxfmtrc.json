@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "singleQuote": true,
+  "singleQuote": false,
   "ignorePatterns": [
     "src/client/routeTree.gen.ts",
     "src/worker/db/auth-schema.ts",
