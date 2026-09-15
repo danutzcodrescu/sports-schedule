@@ -1,10 +1,46 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "react", "oxc"],
+  "plugins": ["typescript", "unicorn", "react", "oxc", "import"],
+  "jsPlugins": ["eslint-plugin-perfectionist"],
   "categories": {
     "correctness": "error"
   },
-  "rules": {},
+  "rules": {
+    "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
+    "typescript/consistent-type-imports": [
+      "error",
+      {
+        "fixStyle": "separate-type-imports"
+      }
+    ],
+    "perfectionist/sort-imports": [
+      "error",
+      {
+        "type": "natural",
+        "order": "asc",
+        "newlinesBetween": 0,
+        "groups": [
+          [
+            "value-builtin",
+            "value-external",
+            "value-internal",
+            "value-parent",
+            "value-sibling",
+            "value-index",
+            "value-subpath",
+            "style",
+            "ts-equals-import",
+            "unknown"
+          ],
+          ["side-effect", "side-effect-style"],
+          {
+            "newlinesBetween": 1
+          },
+          "type-import"
+        ]
+      }
+    ]
+  },
   "env": {
     "builtin": true
   },

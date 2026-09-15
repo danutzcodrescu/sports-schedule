@@ -3,7 +3,9 @@ import { Field, FieldError, FieldGroup, FieldLabel, FieldSet } from "#/component
 import { Input } from "#/components/ui/Input.tsx";
 import { authClient } from "#/lib/auth/auth.ts";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, type SubmitEvent } from "react";
+import { useState } from "react";
+
+import type { SubmitEvent } from "react";
 
 export const Route = createFileRoute("/signup")({
   component: RouteComponent,
