@@ -1,3 +1,5 @@
+import { TurnstileField } from "#/components/auth/TurnstileField.tsx";
+import { useTurnstile } from "#/components/auth/useTurnstile.ts";
 import { Button } from "#/components/ui/Button.tsx";
 import { Field, FieldError, FieldGroup, FieldLabel, FieldSet } from "#/components/ui/Field.tsx";
 import { Input } from "#/components/ui/Input.tsx";
@@ -13,6 +15,11 @@ export const Route = createFileRoute("/signin")({
 
 function RouteComponent() {
   const navigate = useNavigate();
+  const {
+    fieldRef: turnstileRef,
+    isConfigured: isTurnstileConfigured,
+    withTurnstile,
+  } = useTurnstile();
   const [isInFlight, setInFlightStatus] = useState(false);
   const [shouldDisplayError, setErrorStatus] = useState(false);
 
@@ -24,10 +31,15 @@ function RouteComponent() {
     const formData = new FormData(e.currentTarget);
 
     try {
-      const response = await authClient.signIn.email({
-        email: formData.get("email") as string,
-        password: formData.get("password") as string,
-      });
+      const response = await withTurnstile((fetchOptions) =>
+        authClient.signIn.email({
+          email: formData.get("email") as string,
+          password: formData.get("password") as string,
+          fetchOptions,
+        }),
+      );
+
+      if (!response) return;
 
       if (response.error) {
         setErrorStatus(true);
@@ -77,7 +89,13 @@ function RouteComponent() {
             </Field>
           </FieldGroup>
         </FieldSet>
-        <Button size="lg" className="w-fit" type="submit" disabled={isInFlight}>
+        <TurnstileField ref={turnstileRef} />
+        <Button
+          size="lg"
+          className="w-fit"
+          type="submit"
+          disabled={isInFlight || !isTurnstileConfigured}
+        >
           Sign in
         </Button>
         {shouldDisplayError ? <FieldError>Invalid email or password.</FieldError> : null}

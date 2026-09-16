@@ -1,4 +1,5 @@
 import { requireAuth } from "../auth/middleware";
+import { rateLimitSports } from "../rate-limit";
 import { createSportsDbUrl } from "../services/sportsdb";
 import { Hono } from "hono";
 
@@ -101,6 +102,7 @@ function leagueUrl(apiKey: string, endpoint: string, leagueId: string) {
 
 export const sportsRoutes = new Hono<AppEnv>()
   .use("*", requireAuth)
+  .use("*", rateLimitSports)
   .get("/", async (c) => {
     const result = await getCachedJson<SportsResponse>(
       c.env.SPORTS_CACHE,

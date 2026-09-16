@@ -1,6 +1,7 @@
 import { requireAuth } from "../auth/middleware";
 import { createDb } from "../db";
 import { followedLeague, league } from "../db/app-schema";
+import { rateLimitMutation, rateLimitRead } from "../rate-limit";
 import { getLeagueDetails } from "../services/sportsdb";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
@@ -13,7 +14,7 @@ type FollowLeagueBody = {
 
 export const followedLeaguesRoutes = new Hono<AppEnv>()
   .use("*", requireAuth)
-  .get("/", async (c) => {
+  .get("/", rateLimitRead, async (c) => {
     const leagues = await createDb(c.env.DB)
       .select({
         leagueId: followedLeague.leagueId,
@@ -29,7 +30,7 @@ export const followedLeaguesRoutes = new Hono<AppEnv>()
 
     return c.json({ leagues });
   })
-  .post("/", async (c) => {
+  .post("/", rateLimitMutation, async (c) => {
     const body = await c.req.json<FollowLeagueBody>().catch(() => null);
 
     if (!body || typeof body.leagueId !== "string" || !/^\d+$/.test(body.leagueId)) {
@@ -92,7 +93,7 @@ export const followedLeaguesRoutes = new Hono<AppEnv>()
       201,
     );
   })
-  .delete("/:leagueId", async (c) => {
+  .delete("/:leagueId", rateLimitMutation, async (c) => {
     const leagueId = c.req.param("leagueId");
 
     if (!/^\d+$/.test(leagueId)) {

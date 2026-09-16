@@ -1,16 +1,38 @@
 import { createAuth } from "./auth/auth";
+import { rateLimitApi, rateLimitAuth } from "./rate-limit";
 import { followedLeaguesRoutes } from "./routes/followed-leagues";
 import { sportsRoutes } from "./routes/sports";
 import { Hono } from "hono";
 
 import type { AppEnv } from "./auth/middleware";
 
+const SIGNUP_FEATURE_FLAG = "signup-enabled";
+
+function isSignupEnabled(env: CloudflareBindings) {
+  return env.FEATURE_FLAGS.get(SIGNUP_FEATURE_FLAG).then((value) => value === "true");
+}
+
 const app = new Hono<AppEnv>()
-  .basePath("/api")
-  .on(["GET", "POST"], "/auth/*", (c) => createAuth(c.env).handler(c.req.raw))
-  .get("/health", (c) => c.json({ status: "ok" }))
-  .route("/followed-leagues", followedLeaguesRoutes)
-  .route("/sports", sportsRoutes);
+  .on(["GET", "HEAD"], "/signup", async (c) => {
+    if (!(await isSignupEnabled(c.env))) {
+      return c.redirect("/signin", 302);
+    }
+
+    return c.env.ASSETS.fetch(c.req.raw);
+  })
+  .use("/api/*", rateLimitApi)
+  .use("/api/auth/*", rateLimitAuth)
+  .post("/api/auth/sign-up/email", async (c) => {
+    if (!(await isSignupEnabled(c.env))) {
+      return c.json({ error: "Signup is disabled" }, 403);
+    }
+
+    return createAuth(c.env).handler(c.req.raw);
+  })
+  .on(["GET", "POST"], "/api/auth/*", (c) => createAuth(c.env).handler(c.req.raw))
+  .get("/api/health", (c) => c.json({ status: "ok" }))
+  .route("/api/followed-leagues", followedLeaguesRoutes)
+  .route("/api/sports", sportsRoutes);
 
 export default app;
 export type AppType = typeof app;
