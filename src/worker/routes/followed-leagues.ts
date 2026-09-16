@@ -34,6 +34,7 @@ export const followedLeaguesRoutes = new Hono<AppEnv>()
     const body = await c.req.json<FollowLeagueBody>().catch(() => null);
 
     if (!body || typeof body.leagueId !== "string" || !/^\d+$/.test(body.leagueId)) {
+      console.warn("Invalid follow league request");
       return c.json({ error: "Invalid league" }, 400);
     }
 
@@ -41,11 +42,16 @@ export const followedLeaguesRoutes = new Hono<AppEnv>()
 
     try {
       details = await getLeagueDetails(c.env.SPORTS_CACHE, c.env.SPORTSDB_API_KEY, body.leagueId);
-    } catch {
+    } catch (error) {
+      console.error("Failed to fetch league details from TheSportsDB", {
+        leagueId: body.leagueId,
+        error,
+      });
       return c.json({ error: "TheSportsDB request failed" }, 502);
     }
 
     if (!details) {
+      console.warn("League not found in TheSportsDB", { leagueId: body.leagueId });
       return c.json({ error: "League not found" }, 404);
     }
 
@@ -97,6 +103,7 @@ export const followedLeaguesRoutes = new Hono<AppEnv>()
     const leagueId = c.req.param("leagueId");
 
     if (!/^\d+$/.test(leagueId)) {
+      console.warn("Invalid league ID parameter", { endpoint: "unfollow", leagueId });
       return c.json({ error: "Invalid league ID" }, 400);
     }
 

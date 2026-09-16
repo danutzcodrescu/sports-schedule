@@ -75,23 +75,31 @@ async function getCachedJson<T>(
   url: URL,
   expirationTtl: number,
 ): Promise<CacheResult<T> | null> {
-  const cached = await cache.get<T>(key, "json");
+  const endpoint = url.pathname.slice(url.pathname.lastIndexOf("/") + 1);
 
-  if (cached) {
-    return { data: cached, status: "HIT" };
-  }
+  try {
+    const cached = await cache.get<T>(key, "json");
 
-  const response = await fetch(url);
+    if (cached) {
+      return { data: cached, status: "HIT" };
+    }
 
-  if (!response.ok) {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      console.error("TheSportsDB request failed", { endpoint, status: response.status });
+      return null;
+    }
+
+    const data = (await response.json()) as T;
+
+    await cache.put(key, JSON.stringify(data), { expirationTtl });
+
+    return { data, status: "MISS" };
+  } catch (error) {
+    console.error("TheSportsDB request threw an error", { endpoint, error });
     return null;
   }
-
-  const data = (await response.json()) as T;
-
-  await cache.put(key, JSON.stringify(data), { expirationTtl });
-
-  return { data, status: "MISS" };
 }
 
 function leagueUrl(apiKey: string, endpoint: string, leagueId: string) {
@@ -122,6 +130,7 @@ export const sportsRoutes = new Hono<AppEnv>()
     const sport = c.req.param("sport").trim();
 
     if (!sport || sport.length > 64) {
+      console.warn("Invalid sport parameter", { sport });
       return c.json({ error: "Invalid sport" }, 400);
     }
 
@@ -154,6 +163,7 @@ export const sportsRoutes = new Hono<AppEnv>()
     const leagueId = c.req.param("leagueId");
 
     if (!/^\d+$/.test(leagueId)) {
+      console.warn("Invalid league ID parameter", { endpoint: "teams", leagueId });
       return c.json({ error: "Invalid league ID" }, 400);
     }
 
@@ -175,6 +185,7 @@ export const sportsRoutes = new Hono<AppEnv>()
     const leagueId = c.req.param("leagueId");
 
     if (!/^\d+$/.test(leagueId)) {
+      console.warn("Invalid league ID parameter", { endpoint: "events", leagueId });
       return c.json({ error: "Invalid league ID" }, 400);
     }
 

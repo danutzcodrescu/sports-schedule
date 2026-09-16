@@ -36,5 +36,15 @@ const app = new Hono<AppEnv>()
   .route("/api/followed-leagues", followedLeaguesRoutes)
   .route("/api/sports", sportsRoutes);
 
+app.onError((error, c) => {
+  console.error("Unhandled request error", {
+    method: c.req.method,
+    path: c.req.path,
+    error,
+  });
+
+  return c.json({ error: "Internal server error" }, 500);
+});
+
 export default app;
 export type AppType = typeof app;
