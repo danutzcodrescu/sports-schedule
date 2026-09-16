@@ -3,6 +3,7 @@ import { rateLimitApi, rateLimitAuth } from "./rate-limit";
 import { followedLeaguesRoutes } from "./routes/followed-leagues";
 import { sportsRoutes } from "./routes/sports";
 import { Hono } from "hono";
+import { logger } from "hono/logger";
 
 import type { AppEnv } from "./auth/middleware";
 
@@ -13,6 +14,7 @@ function isSignupEnabled(env: CloudflareBindings) {
 }
 
 const app = new Hono<AppEnv>()
+  .use(logger())
   .on(["GET", "HEAD"], "/signup", async (c) => {
     if (!(await isSignupEnabled(c.env))) {
       return c.redirect("/signin", 302);
