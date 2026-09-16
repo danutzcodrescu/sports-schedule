@@ -141,6 +141,10 @@ export function AddLeagueDialog({ followedLeagues, onOpenChange, onSaved }: AddL
   const filteredLeagues = leagues.filter((league) =>
     `${league.strLeague} ${league.strCountry ?? ""}`.toLowerCase().includes(deferredSearch),
   );
+  const followedLeagueIds = new Set(followedLeagues.map((league) => league.leagueId));
+  const newSelectionCount = [...state.selectedLeagues.keys()].filter(
+    (leagueId) => !followedLeagueIds.has(leagueId),
+  ).length;
 
   function selectSport(sport: Sport) {
     dispatch({ type: "sportSelected", sport });
@@ -151,9 +155,8 @@ export function AddLeagueDialog({ followedLeagues, onOpenChange, onSaved }: AddL
   }
 
   function saveLeagues() {
-    const originalIds = new Set(followedLeagues.map((league) => league.leagueId));
     const additions = [...state.selectedLeagues.values()].filter(
-      (league) => !originalIds.has(league.idLeague),
+      (league) => !followedLeagueIds.has(league.idLeague),
     );
     const removals = followedLeagues.filter(
       (league) => !state.selectedLeagues.has(league.leagueId),
@@ -300,7 +303,7 @@ export function AddLeagueDialog({ followedLeagues, onOpenChange, onSaved }: AddL
         <DialogFooter className="dialog-footer-padding border-t">
           {state.step === "leagues" ? (
             <Button onClick={saveLeagues} disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? "Saving…" : `Done · ${state.selectedLeagues.size} selected`}
+              {saveMutation.isPending ? "Saving…" : `Done · ${newSelectionCount} selected`}
             </Button>
           ) : (
             <span className="text-sm text-muted-foreground">Choose a sport to continue</span>
