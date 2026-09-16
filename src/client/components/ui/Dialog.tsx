@@ -27,7 +27,7 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/75 backdrop-blur-sm duration-150 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 z-50 bg-overlay backdrop-blur-sm duration-150 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className,
       )}
       {...props}
@@ -39,15 +39,23 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  size = "default",
+  mobileFullscreen = false,
   ...props
-}: DialogPrimitive.Popup.Props & { showCloseButton?: boolean }) {
+}: DialogPrimitive.Popup.Props & {
+  showCloseButton?: boolean;
+  size?: "default" | "wide";
+  mobileFullscreen?: boolean;
+}) {
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
+        data-size={size}
+        data-mobile-fullscreen={mobileFullscreen}
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-1.5rem)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/15 duration-150 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "dialog-viewport @container/dialog z-50 grid overflow-y-auto bg-popover text-popover-foreground shadow-2xl duration-150 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className,
         )}
         {...props}
@@ -55,13 +63,7 @@ function DialogContent({
         {children}
         {showCloseButton ? (
           <DialogPrimitive.Close
-            render={
-              <Button
-                variant="ghost"
-                size="icon-lg"
-                className="absolute top-5 right-5 z-10 rounded-full text-muted-foreground hover:text-foreground"
-              />
-            }
+            render={<Button variant="ghost" size="icon" className="dialog-close-position" />}
           >
             <HugeiconsIcon icon={Cancel01Icon} className="size-5" />
             <span className="sr-only">Close</span>
@@ -82,7 +84,10 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-footer"
-      className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)}
+      className={cn(
+        "flex flex-col-reverse gap-2 @lg/dialog:flex-row @lg/dialog:justify-end",
+        className,
+      )}
       {...props}
     />
   );
@@ -92,7 +97,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("font-heading text-xl font-semibold", className)}
+      className={cn("section-title", className)}
       {...props}
     />
   );

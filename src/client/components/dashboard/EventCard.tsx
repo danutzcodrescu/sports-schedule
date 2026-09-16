@@ -1,3 +1,4 @@
+import { Badge } from "#/components/ui/Badge";
 import { getEventStart, getEventStatus } from "./event-utils";
 import { TrophyIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -20,38 +21,35 @@ export function EventCard({ event, now }: EventCardProps) {
 
   return (
     <article
-      className={`relative isolate flex min-h-72 overflow-hidden rounded-2xl border bg-[#0c1322] p-5 transition hover:-translate-y-0.5 hover:border-slate-600 ${
-        status === "live"
-          ? "border-rose-500/60 shadow-[0_0_28px_rgba(244,63,94,0.08)]"
-          : "border-slate-700/80"
-      }`}
+      className="panel event-card-size relative isolate flex min-w-0 overflow-hidden p-4 data-[live=true]:border-live/50"
+      data-live={status === "live"}
     >
       {event.strThumb ? (
         <img
           src={event.strThumb}
           alt=""
-          className="absolute inset-0 -z-10 size-full object-cover opacity-[0.07]"
+          className="absolute inset-0 -z-10 size-full object-cover opacity-10"
         />
       ) : null}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-slate-900/20 via-[#0c1322]/85 to-[#0c1322]" />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-card/50 to-card" />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between gap-3 text-xs font-medium text-slate-400">
+        <div className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
           <div className="flex min-w-0 items-center gap-2">
-            <HugeiconsIcon icon={TrophyIcon} className="size-5 shrink-0 text-slate-500" />
-            <span className="truncate">{event.strLeague}</span>
+            <HugeiconsIcon icon={TrophyIcon} className="size-4 shrink-0" />
+            <span className="min-w-0 wrap-anywhere">{event.strLeague}</span>
           </div>
           {status === "live" ? (
-            <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-rose-500/20 px-2.5 py-1 font-semibold tracking-wide text-rose-400 uppercase">
-              <span className="size-1.5 rounded-full bg-rose-400" />
+            <Badge variant="live">
+              <span className="size-1.5 rounded-full bg-live" />
               Live
-            </span>
+            </Badge>
           ) : (
             <span className="shrink-0 tabular-nums">{time}</span>
           )}
         </div>
 
-        <div className="flex flex-1 flex-col justify-center py-6">
+        <div className="flex flex-1 flex-col justify-center py-4 @2xl/schedule:py-6">
           {hasTeams ? (
             <div className="space-y-4">
               <TeamRow name={event.strHomeTeam} badge={event.strHomeTeamBadge} />
@@ -59,29 +57,22 @@ export function EventCard({ event, now }: EventCardProps) {
             </div>
           ) : (
             <div>
-              <h4 className="line-clamp-3 text-xl leading-tight font-semibold text-slate-100">
-                {event.strEvent}
-              </h4>
+              <h4 className="section-title wrap-anywhere">{event.strEvent}</h4>
               {event.intRound ? (
-                <p className="mt-2 text-sm text-slate-400">Round {event.intRound}</p>
+                <p className="mt-2 text-sm text-muted-foreground">Round {event.intRound}</p>
               ) : null}
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-slate-700/70 pt-4 text-xs text-slate-500">
-          <span className="truncate">{event.strVenue || event.strSport}</span>
-          <span
-            className={`shrink-0 rounded-lg px-2.5 py-1.5 font-semibold capitalize ${
-              status === "live"
-                ? "bg-rose-500 text-white"
-                : status === "finished"
-                  ? "bg-slate-800 text-slate-400"
-                  : "bg-slate-100 text-slate-950"
-            }`}
+        <div className="flex items-center justify-between gap-3 border-t pt-4 text-xs text-muted-foreground">
+          <span className="min-w-0 wrap-anywhere">{event.strVenue || event.strSport}</span>
+          <Badge
+            className="capitalize"
+            variant={status === "live" ? "live" : status === "finished" ? "default" : "accent"}
           >
             {status}
-          </span>
+          </Badge>
         </div>
       </div>
     </article>
@@ -93,14 +84,14 @@ function TeamRow({ name, badge }: { name: string | null; badge: string | null })
 
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <span className="grid size-11 shrink-0 place-items-center">
+      <span className="icon-surface size-10 @2xl/schedule:size-12">
         {badge ? (
-          <img src={badge} alt="" className="size-10 object-contain" />
+          <img src={badge} alt="" className="size-8 object-contain @2xl/schedule:size-10" />
         ) : (
-          <HugeiconsIcon icon={TrophyIcon} className="size-6 text-slate-600" />
+          <HugeiconsIcon icon={TrophyIcon} className="size-5" />
         )}
       </span>
-      <span className="truncate text-lg font-semibold text-slate-100">{name}</span>
+      <span className="min-w-0 text-base font-semibold wrap-anywhere">{name}</span>
     </div>
   );
 }

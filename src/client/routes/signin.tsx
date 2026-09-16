@@ -1,3 +1,4 @@
+import { AuthLayout } from "#/components/auth/AuthLayout";
 import { TurnstileField } from "#/components/auth/TurnstileField.tsx";
 import { useTurnstile } from "#/components/auth/useTurnstile.ts";
 import { Button } from "#/components/ui/Button.tsx";
@@ -55,14 +56,16 @@ function RouteComponent() {
   }
 
   return (
-    <div className="h-screen w-screen place-content-center grid p-4">
-      <form className="flex flex-col gap-2 w-full sm:w-xl" onSubmit={onSubmit}>
+    <AuthLayout
+      title="Welcome back"
+      description="Sign in to see your personal sports schedule."
+      alternate={{ prompt: "New to Sports Center?", label: "Create an account", to: "/signup" }}
+    >
+      <form className="flex flex-col gap-6" onSubmit={onSubmit} aria-busy={isInFlight}>
         <FieldSet className="w-full">
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="email" className="text-lg">
-                Email
-              </FieldLabel>
+              <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input
                 id="email"
                 name="email"
@@ -74,9 +77,7 @@ function RouteComponent() {
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="password" className="text-lg">
-                Password
-              </FieldLabel>
+              <FieldLabel htmlFor="password">Password</FieldLabel>
               <Input
                 id="password"
                 name="password"
@@ -92,14 +93,14 @@ function RouteComponent() {
         <TurnstileField ref={turnstileRef} />
         <Button
           size="lg"
-          className="w-fit"
+          className="w-full"
           type="submit"
           disabled={isInFlight || !isTurnstileConfigured}
         >
-          Sign in
+          {isInFlight ? "Signing in…" : "Sign in"}
         </Button>
         {shouldDisplayError ? <FieldError>Invalid email or password.</FieldError> : null}
       </form>
-    </div>
+    </AuthLayout>
   );
 }

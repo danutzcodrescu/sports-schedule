@@ -46,7 +46,8 @@ export function TurnstileField({ ref }: TurnstileFieldProps) {
       <Turnstile
         ref={widgetRef}
         siteKey={siteKey}
-        options={{ size: "flexible", theme: "auto" }}
+        className="self-center"
+        options={{ size: "compact", theme: "auto" }}
         onSuccess={() => setErrorStatus(false)}
         onError={() => setErrorStatus(true)}
       />

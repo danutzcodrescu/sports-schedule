@@ -1,3 +1,4 @@
+import { AuthLayout } from "#/components/auth/AuthLayout";
 import { TurnstileField } from "#/components/auth/TurnstileField.tsx";
 import { useTurnstile } from "#/components/auth/useTurnstile.ts";
 import { Button } from "#/components/ui/Button.tsx";
@@ -64,14 +65,16 @@ function RouteComponent() {
   }
 
   return (
-    <div className="h-screen w-screen place-content-center grid p-4">
-      <form className="flex flex-col gap-2 w-full sm:w-xl" onSubmit={onSubmit}>
+    <AuthLayout
+      title="Create an account"
+      description="Follow your favorite leagues and keep every event in one place."
+      alternate={{ prompt: "Already have an account?", label: "Sign in", to: "/signin" }}
+    >
+      <form className="flex flex-col gap-6" onSubmit={onSubmit} aria-busy={isInFlight}>
         <FieldSet className="w-full">
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="email" className="text-lg">
-                Email
-              </FieldLabel>
+              <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input
                 id="email"
                 name="email"
@@ -83,9 +86,7 @@ function RouteComponent() {
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="password" className="text-lg">
-                Password
-              </FieldLabel>
+              <FieldLabel htmlFor="password">Password</FieldLabel>
               <Input
                 id="password"
                 name="password"
@@ -98,9 +99,7 @@ function RouteComponent() {
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="password-validation" className="text-lg">
-                Confirm password
-              </FieldLabel>
+              <FieldLabel htmlFor="password-validation">Confirm password</FieldLabel>
               <Input
                 id="password-validation"
                 name="password-validation"
@@ -118,16 +117,16 @@ function RouteComponent() {
         <TurnstileField ref={turnstileRef} />
         <Button
           size="lg"
-          className="w-fit"
+          className="w-full"
           type="submit"
           disabled={isInFlight || !isTurnstileConfigured}
         >
-          Sign up
+          {isInFlight ? "Creating account…" : "Create account"}
         </Button>
         {shouldDisplayError ? (
           <FieldError>There was an issue with the authentication</FieldError>
         ) : null}
       </form>
-    </div>
+    </AuthLayout>
   );
 }

@@ -6,12 +6,12 @@ import type { VariantProps } from "class-variance-authority";
 import type * as React from "react";
 
 const inputVariants = cva(
-  "w-full min-w-0 rounded-md border border-input bg-input/20 transition-colors outline-none file:inline-flex file:border-0 file:bg-transparent file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+  "w-full min-w-0 rounded-md border border-input bg-background text-foreground transition-colors file:inline-flex file:border-0 file:bg-transparent file:font-medium file:text-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20",
   {
     variants: {
       size: {
-        default: "h-7 px-2 py-0.5 text-sm file:h-6 file:text-xs/relaxed md:text-xs/relaxed",
-        lg: "h-10 px-3 py-1 text-base file:h-9 file:text-sm md:text-base",
+        default: "h-control px-3 py-2 text-base file:text-sm",
+        lg: "h-control-lg px-4 py-3 text-base file:text-base",
       },
     },
     defaultVariants: {

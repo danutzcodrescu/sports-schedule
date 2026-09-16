@@ -40,8 +40,8 @@ export function SportsDashboard({
   const hasError = eventQueries.length > 0 && eventQueries.every((query) => query.isError);
 
   return (
-    <div className="dark min-h-dvh bg-[#070b16] text-slate-100">
-      <div className="mx-auto flex min-h-dvh max-w-[1600px]">
+    <div className="safe-area min-h-dvh bg-background text-foreground">
+      <div className="mx-auto flex min-h-dvh max-w-app">
         <LeagueSidebar
           userName={userName}
           leagues={leagues}
@@ -51,7 +51,7 @@ export function SportsDashboard({
           onSignOut={onSignOut}
         />
 
-        <main className="min-w-0 flex-1">
+        <main className="@container/dashboard min-w-0 flex-1">
           <DashboardHeader
             leagues={leagues}
             activeLeagueId={activeLeagueId}

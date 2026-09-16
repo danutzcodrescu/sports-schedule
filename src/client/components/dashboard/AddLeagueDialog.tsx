@@ -1,3 +1,4 @@
+import { Badge } from "#/components/ui/Badge";
 import { Button } from "#/components/ui/Button";
 import {
   Dialog,
@@ -8,6 +9,7 @@ import {
   DialogTitle,
 } from "#/components/ui/Dialog";
 import { Input } from "#/components/ui/Input";
+import { SelectionButton } from "#/components/ui/SelectionButton";
 import { followLeague, getLeagues, getSports, unfollowLeague } from "#/lib/api/sports";
 import {
   ArrowLeft01Icon,
@@ -167,49 +169,46 @@ export function AddLeagueDialog({ followedLeagues, onOpenChange, onSaved }: AddL
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="dark h-[min(780px,calc(100dvh-1.5rem))] max-w-5xl grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden border border-white/10 bg-[#0a1020] text-slate-50">
-        <DialogHeader className="border-b border-white/10 px-6 py-6 pr-16 sm:px-8">
-          <div className="flex items-center gap-3">
+      <DialogContent size="wide" mobileFullscreen className="dialog-layout overflow-hidden">
+        <DialogHeader className="dialog-header-padding border-b">
+          <div className="flex flex-wrap items-center gap-3">
             {state.step === "leagues" ? (
               <Button
                 variant="ghost"
                 size="icon"
-                className="-ml-2 text-slate-300"
+                className="-ml-2"
                 onClick={goBack}
                 aria-label="Choose another sport"
               >
                 <HugeiconsIcon icon={ArrowLeft01Icon} />
               </Button>
             ) : null}
-            <DialogTitle className="text-2xl">Add a league</DialogTitle>
-            <span className="text-sm font-medium text-slate-400">
-              Step {state.step === "sports" ? 1 : 2} of 2
-            </span>
+            <DialogTitle>Add a league</DialogTitle>
+            <Badge>Step {state.step === "sports" ? 1 : 2} of 2</Badge>
           </div>
-          <DialogDescription className="text-base text-slate-400">
+          <DialogDescription>
             {state.step === "sports"
               ? "Pick a sport to browse its leagues"
               : `Pick leagues to follow — ${state.selectedSport.strSport}`}
           </DialogDescription>
-          <div className="mt-4 h-1 overflow-hidden rounded-full bg-slate-800">
+          <div className="mt-4 h-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
             <div
-              className="h-full rounded-full bg-slate-100 transition-[width] duration-300"
-              style={{ width: state.step === "sports" ? "50%" : "100%" }}
+              className={`h-full rounded-full bg-primary transition-all ${state.step === "sports" ? "w-1/2" : "w-full"}`}
             />
           </div>
         </DialogHeader>
 
-        <div className="min-h-0 overflow-y-auto px-6 py-5 sm:px-8">
-          <div className="relative mb-5">
+        <div className="dialog-body-padding min-h-0 overflow-y-auto overscroll-contain">
+          <div className="relative mb-4">
             <HugeiconsIcon
               icon={Search01Icon}
-              className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted-foreground"
             />
             <Input
               value={state.search}
               onChange={(event) => dispatch({ type: "searchChanged", search: event.target.value })}
               size="lg"
-              className="h-12 border-slate-700 bg-slate-950/60 pl-12 text-base text-slate-100 placeholder:text-slate-500"
+              className="pl-12"
               placeholder={
                 state.step === "sports"
                   ? "Search sports..."
@@ -220,31 +219,35 @@ export function AddLeagueDialog({ followedLeagues, onOpenChange, onSaved }: AddL
           </div>
 
           {error ? (
-            <div
-              className="mb-4 rounded-lg border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200"
-              role="alert"
-            >
+            <div className="alert-error mb-4" role="alert">
               {error}
             </div>
           ) : null}
 
           {isLoading ? (
-            <div className="grid h-48 place-items-center text-sm text-slate-400">Loading…</div>
+            <div className="empty-state text-sm text-muted-foreground" role="status">
+              Loading…
+            </div>
           ) : state.step === "sports" ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 @xl/dialog:grid-cols-2 @4xl/dialog:grid-cols-3">
               {filteredSports.map((sport) => (
-                <button
+                <SelectionButton
+                  variant="card"
                   key={sport.idSport}
-                  type="button"
                   onClick={() => selectSport(sport)}
-                  className="group flex min-h-24 items-center gap-4 rounded-xl border border-slate-700 bg-slate-950/35 px-5 text-left transition hover:-translate-y-0.5 hover:border-slate-500 hover:bg-slate-800/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-200"
+                  className="min-h-24"
                 >
-                  <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-slate-800 text-slate-300 group-hover:text-white">
+                  <span className="icon-surface size-10">
                     <HugeiconsIcon icon={TrophyIcon} className="size-5" />
                   </span>
-                  <span className="font-semibold text-slate-100">{sport.strSport}</span>
-                </button>
+                  <span className="min-w-0 font-semibold wrap-anywhere">{sport.strSport}</span>
+                </SelectionButton>
               ))}
+              {!filteredSports.length ? (
+                <div className="empty-state col-span-full text-sm text-muted-foreground">
+                  No matching sports found.
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="space-y-2">
@@ -252,38 +255,41 @@ export function AddLeagueDialog({ followedLeagues, onOpenChange, onSaved }: AddL
                 const selected = state.selectedLeagues.has(league.idLeague);
 
                 return (
-                  <button
+                  <SelectionButton
+                    variant="card"
                     key={league.idLeague}
-                    type="button"
                     onClick={() => toggleLeague(league)}
                     aria-pressed={selected}
-                    className="flex w-full items-center gap-4 rounded-xl border border-slate-700 bg-slate-950/35 p-4 text-left transition hover:border-slate-500 hover:bg-slate-800/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-200 aria-pressed:border-slate-500 aria-pressed:bg-slate-800"
                   >
-                    <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-900">
+                    <span className="icon-surface size-12 overflow-hidden">
                       {league.strBadge ? (
                         <img src={league.strBadge} alt="" className="size-10 object-contain" />
                       ) : (
-                        <HugeiconsIcon icon={TrophyIcon} className="size-5 text-slate-400" />
+                        <HugeiconsIcon icon={TrophyIcon} className="size-5" />
                       )}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold text-slate-100">
-                        {league.strLeague}
-                      </span>
-                      <span className="mt-1 flex items-center gap-1.5 text-sm text-slate-400">
-                        <HugeiconsIcon icon={Globe02Icon} className="size-3.5" />
-                        {league.strCountry || "Worldwide"}
+                      <span className="block font-semibold wrap-anywhere">{league.strLeague}</span>
+                      <span className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <HugeiconsIcon icon={Globe02Icon} className="size-4 shrink-0" />
+                        <span className="min-w-0 wrap-anywhere">
+                          {league.strCountry || "Worldwide"}
+                        </span>
                       </span>
                     </span>
                     <HugeiconsIcon
                       icon={selected ? CheckmarkCircle02Icon : PlusSignIcon}
-                      className={selected ? "size-6 text-emerald-400" : "size-6 text-slate-400"}
+                      className={
+                        selected
+                          ? "size-5 shrink-0 text-primary"
+                          : "size-5 shrink-0 text-muted-foreground"
+                      }
                     />
-                  </button>
+                  </SelectionButton>
                 );
               })}
               {!filteredLeagues.length ? (
-                <div className="grid h-40 place-items-center text-sm text-slate-400">
+                <div className="empty-state text-sm text-muted-foreground">
                   No matching leagues found.
                 </div>
               ) : null}
@@ -291,18 +297,13 @@ export function AddLeagueDialog({ followedLeagues, onOpenChange, onSaved }: AddL
           )}
         </div>
 
-        <DialogFooter className="border-t border-white/10 px-6 py-4 sm:px-8">
+        <DialogFooter className="dialog-footer-padding border-t">
           {state.step === "leagues" ? (
-            <Button
-              size="lg"
-              className="h-10 bg-slate-100 px-5 text-sm text-slate-950 hover:bg-white"
-              onClick={saveLeagues}
-              disabled={saveMutation.isPending}
-            >
+            <Button onClick={saveLeagues} disabled={saveMutation.isPending}>
               {saveMutation.isPending ? "Saving…" : `Done · ${state.selectedLeagues.size} selected`}
             </Button>
           ) : (
-            <span className="text-sm text-slate-500">Choose a sport to continue</span>
+            <span className="text-sm text-muted-foreground">Choose a sport to continue</span>
           )}
         </DialogFooter>
       </DialogContent>
