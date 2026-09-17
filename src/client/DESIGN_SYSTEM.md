@@ -63,6 +63,11 @@ with text or semantics as well as color.
   previous Favourites/All filter. Choosing Favourites or All clears the individual
   team selection. Team rows use the shared navigation selection style, with a
   separate remove button.
+- The header's league/team search opens a command picker with `Mod+K` (⌘K on
+  macOS, Ctrl+K on Windows/Linux). It searches followed leagues and favourite
+  teams, preserving the sidebar's independent league/team filtering behavior.
+  Arrow keys navigate results, Enter applies a filter, and Escape closes the
+  dialog. Active filters are labeled; choosing an active team clears it.
 - The schedule panel is a `schedule` container. Event grids use the standard
   `2xl` and `5xl` container sizes for two and three columns, independent of the
   viewport or sidebar. Loading cards share the same grid and size recipes.

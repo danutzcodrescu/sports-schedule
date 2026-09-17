@@ -12,10 +12,12 @@ import {
   ArrowDown01Icon,
   Logout01Icon,
   PlusSignIcon,
+  Search01Icon,
   SparklesIcon,
   TrophyIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { formatForDisplay } from "@tanstack/react-hotkeys";
 
 import type { FollowedLeague } from "#/lib/api/sports";
 import type { MyTeamsProps } from "./MyTeams";
@@ -26,6 +28,7 @@ type DashboardHeaderProps = MyTeamsProps & {
   onLeagueChange: (leagueId: string | null) => void;
   onAddLeague: () => void;
   onSignOut: () => Promise<void>;
+  onSearch: () => void;
 };
 
 export function DashboardHeader({
@@ -34,6 +37,7 @@ export function DashboardHeader({
   onLeagueChange,
   onAddLeague,
   onSignOut,
+  onSearch,
   ...teamProps
 }: DashboardHeaderProps) {
   const activeLeague = leagues.find((league) => league.leagueId === activeLeagueId);
@@ -54,6 +58,18 @@ export function DashboardHeader({
           </Button>
         </div>
       </div>
+
+      <Button
+        variant="outline"
+        className="mt-4 w-full justify-start @xl/dashboard:w-auto"
+        onClick={onSearch}
+      >
+        <HugeiconsIcon icon={Search01Icon} className="size-4" />
+        <span className="flex-1 text-left">Find a league or team</span>
+        <kbd className="ml-3 rounded border bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+          {formatForDisplay("Mod+K")}
+        </kbd>
+      </Button>
 
       {leagues.length ? (
         <div className="mt-4 lg:hidden">

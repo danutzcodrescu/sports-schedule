@@ -5,7 +5,9 @@ import { AddTeamDialog } from "./AddTeamDialog";
 import { DashboardHeader } from "./DashboardHeader";
 import { sortAndDeduplicateEvents } from "./event-utils";
 import { EventSchedule } from "./EventSchedule";
+import { FilterCommandDialog } from "./FilterCommandDialog";
 import { LeagueSidebar } from "./LeagueSidebar";
+import { useHotkey } from "@tanstack/react-hotkeys";
 import { useMutation, useQueries } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -30,8 +32,13 @@ export function SportsDashboard({
 }: SportsDashboardProps) {
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [isTeamDialogOpen, setTeamDialogOpen] = useState(false);
+  const [isFilterDialogOpen, setFilterDialogOpen] = useState(false);
   const [activeLeagueId, setActiveLeagueId] = useState<string | null>(null);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+  useHotkey("Mod+K", () => setFilterDialogOpen((open) => !open), {
+    enabled: !isDialogOpen && !isTeamDialogOpen,
+    requireReset: true,
+  });
   const selectedTeam = favouriteTeams.find((team) => team.teamId === activeTeamId) ?? null;
   const selectedLeagueId = leagues.some((league) => league.leagueId === activeLeagueId)
     ? activeLeagueId
@@ -81,6 +88,7 @@ export function SportsDashboard({
         <main className="@container/dashboard min-w-0 flex-1">
           <DashboardHeader
             {...teamProps}
+            onSearch={() => setFilterDialogOpen(true)}
             leagues={leagues}
             activeLeagueId={selectedLeagueId}
             onLeagueChange={setActiveLeagueId}
@@ -99,6 +107,18 @@ export function SportsDashboard({
           />
         </main>
       </div>
+
+      <FilterCommandDialog
+        open={isFilterDialogOpen}
+        onOpenChange={setFilterDialogOpen}
+        leagues={leagues}
+        teams={favouriteTeams}
+        activeLeagueId={selectedLeagueId}
+        activeTeamId={selectedTeam?.teamId ?? null}
+        onLeagueChange={setActiveLeagueId}
+        onTeamChange={teamProps.onTeamChange}
+        onClearTeam={() => setActiveTeamId(null)}
+      />
 
       {isDialogOpen ? (
         <AddLeagueDialog
