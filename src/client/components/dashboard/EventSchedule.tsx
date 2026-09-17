@@ -33,6 +33,8 @@ const scheduleFilters = [
 type EventScheduleProps = {
   events: SportsEvent[];
   favouriteTeams: FavouriteTeam[];
+  selectedTeam: FavouriteTeam | null;
+  onClearTeam: () => void;
   isLoading: boolean;
   hasError: boolean;
   hasLeagues: boolean;
@@ -42,6 +44,8 @@ type EventScheduleProps = {
 export function EventSchedule({
   events,
   favouriteTeams,
+  selectedTeam,
+  onClearTeam,
   isLoading,
   hasError,
   hasLeagues,
@@ -62,10 +66,15 @@ export function EventSchedule({
 
   const teamEvents = filterEventsByTeams(
     events,
-    teamFilter,
-    new Set(favouriteTeams.map((team) => team.teamId)),
+    selectedTeam ? "favourites" : teamFilter,
+    new Set(selectedTeam ? [selectedTeam.teamId] : favouriteTeams.map((team) => team.teamId)),
   );
-  const isFilteringTeams = teamFilter === "favourites" && favouriteTeams.length > 0;
+  const isFilteringTeams =
+    Boolean(selectedTeam) || (teamFilter === "favourites" && favouriteTeams.length > 0);
+  const changeTeamFilter = (filter: TeamFilter) => {
+    setTeamFilter(filter);
+    onClearTeam();
+  };
   const visibleEvents = filterEvents(teamEvents, activeFilter, now);
   const eventGroups = groupEventsByLocalDay(visibleEvents);
   const liveCount = teamEvents.filter((event) => getEventStatus(event, now) === "live").length;
@@ -92,13 +101,16 @@ export function EventSchedule({
           aria-label="Schedule teams"
         >
           <SelectionButton
-            aria-pressed={teamFilter === "favourites"}
-            onClick={() => setTeamFilter("favourites")}
+            aria-pressed={!selectedTeam && teamFilter === "favourites"}
+            onClick={() => changeTeamFilter("favourites")}
           >
             <HugeiconsIcon icon={FavouriteIcon} className="size-4" />
             Favourites
           </SelectionButton>
-          <SelectionButton aria-pressed={teamFilter === "all"} onClick={() => setTeamFilter("all")}>
+          <SelectionButton
+            aria-pressed={!selectedTeam && teamFilter === "all"}
+            onClick={() => changeTeamFilter("all")}
+          >
             All
           </SelectionButton>
         </div>
@@ -112,7 +124,11 @@ export function EventSchedule({
               {isLoading
                 ? "Loading events..."
                 : `${visibleEvents.length} scheduled ${visibleEvents.length === 1 ? "event" : "events"}`}
-              {isFilteringTeams ? " · Favourite teams" : ""}
+              {selectedTeam
+                ? ` · ${selectedTeam.teamName}`
+                : isFilteringTeams
+                  ? " · Favourite teams"
+                  : ""}
             </p>
           </div>
           <Badge>Your local time</Badge>
@@ -149,7 +165,8 @@ export function EventSchedule({
             hasLeagues={hasLeagues}
             onAddLeague={onAddLeague}
             isFilteringTeams={isFilteringTeams}
-            onShowAll={() => setTeamFilter("all")}
+            selectedTeamName={selectedTeam?.teamName}
+            onShowAll={() => changeTeamFilter("all")}
           />
         )}
       </div>
@@ -173,6 +190,7 @@ function EventEmptyState({
   hasLeagues,
   onAddLeague,
   isFilteringTeams,
+  selectedTeamName,
   onShowAll,
 }: {
   activeFilter: ScheduleFilter;
@@ -180,6 +198,7 @@ function EventEmptyState({
   hasLeagues: boolean;
   onAddLeague: () => void;
   isFilteringTeams: boolean;
+  selectedTeamName?: string;
   onShowAll: () => void;
 }) {
   return (
@@ -195,9 +214,11 @@ function EventEmptyState({
           {hasError
             ? "The schedule service is unavailable right now. Try again shortly."
             : hasLeagues
-              ? isFilteringTeams
-                ? "Your favourite teams have no matching events in the selected leagues."
-                : "There are no matching events in your followed leagues."
+              ? selectedTeamName
+                ? `${selectedTeamName} has no matching events in the selected leagues.`
+                : isFilteringTeams
+                  ? "Your favourite teams have no matching events in the selected leagues."
+                  : "There are no matching events in your followed leagues."
               : "Follow a league to populate your personal sports schedule."}
         </p>
         {!hasLeagues ? (

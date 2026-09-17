@@ -1,5 +1,6 @@
 import { Badge } from "#/components/ui/Badge";
 import { Button } from "#/components/ui/Button";
+import { SelectionButton } from "#/components/ui/SelectionButton";
 import {
   Cancel01Icon,
   FavouriteIcon,
@@ -12,6 +13,8 @@ import type { FavouriteTeam } from "#/lib/api/sports";
 
 export type MyTeamsProps = {
   teams: FavouriteTeam[];
+  activeTeamId: string | null;
+  onTeamChange: (teamId: string) => void;
   onAddTeam: () => void;
   onRemoveTeam: (teamId: string) => void;
   isSavingTeams: boolean;
@@ -20,6 +23,8 @@ export type MyTeamsProps = {
 
 export function MyTeams({
   teams,
+  activeTeamId,
+  onTeamChange,
   onAddTeam,
   onRemoveTeam,
   isSavingTeams,
@@ -51,17 +56,23 @@ export function MyTeams({
       {teams.length ? (
         <ul className="p-1">
           {teams.map((team) => (
-            <li key={team.teamId} className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1">
-              <span className="icon-surface size-6 overflow-hidden">
-                {team.badgeUrl ? (
-                  <img src={team.badgeUrl} alt="" className="size-5 object-contain" />
-                ) : (
-                  <HugeiconsIcon icon={FavouriteIcon} className="size-3.5" />
-                )}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-xs font-medium" title={team.teamName}>
-                {team.teamName}
-              </span>
+            <li key={team.teamId} className="flex min-w-0 items-center gap-2 rounded-lg pr-2">
+              <SelectionButton
+                variant="navigation"
+                className="flex-1"
+                aria-pressed={activeTeamId === team.teamId}
+                onClick={() => onTeamChange(team.teamId)}
+                title={team.teamName}
+              >
+                <span className="icon-surface size-6 overflow-hidden">
+                  {team.badgeUrl ? (
+                    <img src={team.badgeUrl} alt="" className="size-5 object-contain" />
+                  ) : (
+                    <HugeiconsIcon icon={FavouriteIcon} className="size-3.5" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-medium">{team.teamName}</span>
+              </SelectionButton>
               <Button
                 variant="ghost"
                 size="icon-xs"

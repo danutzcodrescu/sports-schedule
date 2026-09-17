@@ -58,7 +58,11 @@ with text or semantics as well as color.
 - The team picker uses the same two-step dialog pattern as leagues. Selections are
   retained when changing leagues and saved together on Done. Favourites/All is an
   independent schedule filter, defaults to Favourites, and falls back to all teams
-  when no favourites exist.
+  when no favourites exist. Clicking a team in My Teams selects that team's events
+  within the current league and period filters; clicking it again restores the
+  previous Favourites/All filter. Choosing Favourites or All clears the individual
+  team selection. Team rows use the shared navigation selection style, with a
+  separate remove button.
 - The schedule panel is a `schedule` container. Event grids use the standard
   `2xl` and `5xl` container sizes for two and three columns, independent of the
   viewport or sidebar. Loading cards share the same grid and size recipes.

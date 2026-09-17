@@ -31,6 +31,8 @@ export function SportsDashboard({
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [isTeamDialogOpen, setTeamDialogOpen] = useState(false);
   const [activeLeagueId, setActiveLeagueId] = useState<string | null>(null);
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+  const selectedTeam = favouriteTeams.find((team) => team.teamId === activeTeamId) ?? null;
   const selectedLeagueId = leagues.some((league) => league.leagueId === activeLeagueId)
     ? activeLeagueId
     : null;
@@ -41,6 +43,9 @@ export function SportsDashboard({
   });
   const teamProps = {
     teams: favouriteTeams,
+    activeTeamId: selectedTeam?.teamId ?? null,
+    onTeamChange: (teamId: string) =>
+      setActiveTeamId(selectedTeam?.teamId === teamId ? null : teamId),
     onAddTeam: () => {
       removeTeamMutation.reset();
       setTeamDialogOpen(true);
@@ -85,6 +90,8 @@ export function SportsDashboard({
           <EventSchedule
             events={events}
             favouriteTeams={favouriteTeams}
+            selectedTeam={selectedTeam}
+            onClearTeam={() => setActiveTeamId(null)}
             isLoading={isLoading}
             hasError={hasError}
             hasLeagues={Boolean(leagues.length)}
