@@ -49,7 +49,7 @@ export function MyTeams({
         </p>
       ) : null}
       {teams.length ? (
-        <ul className="sidebar-teams max-h-64 overflow-y-auto overscroll-contain p-1">
+        <ul className="p-1">
           {teams.map((team) => (
             <li key={team.teamId} className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1">
               <span className="icon-surface size-6 overflow-hidden">

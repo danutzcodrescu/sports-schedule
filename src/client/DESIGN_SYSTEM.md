@@ -52,7 +52,7 @@ with text or semantics as well as color.
   radio selection, keyboard navigation, and a scrollable popup.
 - The sidebar is a size container: compact league rows use 24px icon surfaces,
   12px labels, and no inter-row gap. Height queries reduce padding on short screens;
-  independently capped league and team lists keep My Teams accessible beneath leagues.
+  league and team lists expand to their full height within one shared scrollable area.
   Touch controls retain the shared coarse-pointer target size. On mobile, My Teams
   is available in an expandable section beneath the league menu.
 - The team picker uses the same two-step dialog pattern as leagues. Selections are

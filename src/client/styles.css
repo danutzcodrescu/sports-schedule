@@ -157,12 +157,6 @@
   .league-sidebar {
     container: sidebar / size;
   }
-  .sidebar-leagues {
-    max-block-size: 52cqh;
-  }
-  .league-sidebar .sidebar-teams {
-    max-block-size: 24cqh;
-  }
   @container sidebar (height < 48rem) {
     .sidebar-brand {
       @apply px-4 py-3;
@@ -176,9 +170,6 @@
     }
     .sidebar-team-empty {
       @apply gap-2 py-2;
-    }
-    .sidebar-leagues {
-      max-block-size: 44cqh;
     }
   }
   .safe-area {

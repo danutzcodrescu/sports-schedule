@@ -33,7 +33,7 @@ export function LeagueSidebar({
         <Brand />
       </div>
 
-      <div className="sidebar-content min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="sidebar-content min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
         <div className="mb-1 flex items-center justify-between px-2">
           <div className="flex items-center gap-2">
             <h2 className="eyebrow">My leagues</h2>
@@ -44,10 +44,7 @@ export function LeagueSidebar({
           </Button>
         </div>
 
-        <nav
-          className="sidebar-leagues overflow-y-auto overscroll-contain p-1"
-          aria-label="Followed leagues"
-        >
+        <nav className="p-1" aria-label="Followed leagues">
           {leagues.length ? (
             <SelectionButton
               variant="navigation"
