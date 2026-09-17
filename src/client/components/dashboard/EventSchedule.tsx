@@ -35,6 +35,8 @@ type EventScheduleProps = {
   favouriteTeams: FavouriteTeam[];
   selectedTeam: FavouriteTeam | null;
   onClearTeam: () => void;
+  teamFilter: TeamFilter;
+  onTeamFilterChange: (filter: TeamFilter) => void;
   isLoading: boolean;
   hasError: boolean;
   hasLeagues: boolean;
@@ -46,13 +48,14 @@ export function EventSchedule({
   favouriteTeams,
   selectedTeam,
   onClearTeam,
+  teamFilter,
+  onTeamFilterChange,
   isLoading,
   hasError,
   hasLeagues,
   onAddLeague,
 }: EventScheduleProps) {
   const [activeFilter, setActiveFilter] = useState<ScheduleFilter>("upcoming");
-  const [teamFilter, setTeamFilter] = useState<TeamFilter>("favourites");
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -72,7 +75,7 @@ export function EventSchedule({
   const isFilteringTeams =
     Boolean(selectedTeam) || (teamFilter === "favourites" && favouriteTeams.length > 0);
   const changeTeamFilter = (filter: TeamFilter) => {
-    setTeamFilter(filter);
+    onTeamFilterChange(filter);
     onClearTeam();
   };
   const visibleEvents = filterEvents(teamEvents, activeFilter, now);

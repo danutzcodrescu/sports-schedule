@@ -1,8 +1,9 @@
-import { filterEvents, filterEventsByTeams } from "./event-utils.ts";
+import { filterEvents, filterEventsByTeams, leagueHasFavouriteTeam } from "./event-utils.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { SportsEvent } from "#/lib/api/sports";
+import type { FavouriteTeam } from "#/lib/api/sports";
 
 const now = new Date(2026, 8, 16, 12);
 const liveStart = new Date(2026, 8, 16, 11, 30).toISOString();
@@ -28,6 +29,16 @@ function event(id: string, overrides: Partial<SportsEvent> = {}): SportsEvent {
     strVenue: null,
     intRound: null,
     ...overrides,
+  };
+}
+
+function favouriteTeam(teamId: string, leagueId: string): FavouriteTeam {
+  return {
+    teamId,
+    leagueId,
+    teamName: "Favourite",
+    country: null,
+    badgeUrl: null,
   };
 }
 
@@ -79,4 +90,13 @@ test("removing the last favourite restores all events", () => {
   assert.equal(filterEventsByTeams(events, "favourites", favourites).length, 1);
   favourites.delete("10");
   assert.equal(filterEventsByTeams(events, "favourites", favourites).length, 2);
+});
+
+test("detects whether a league contains a favourite team", () => {
+  const favourites = [favouriteTeam("10", "1")];
+  const events = [event("cross-competition", { idLeague: "2", idHomeTeam: "10" })];
+
+  assert.equal(leagueHasFavouriteTeam("1", favourites, []), true);
+  assert.equal(leagueHasFavouriteTeam("2", favourites, events), true);
+  assert.equal(leagueHasFavouriteTeam("3", favourites, events), false);
 });

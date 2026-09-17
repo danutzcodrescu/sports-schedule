@@ -3,7 +3,7 @@ import { leagueEventsQuery } from "#/lib/api/sports-queries";
 import { AddLeagueDialog } from "./AddLeagueDialog";
 import { AddTeamDialog } from "./AddTeamDialog";
 import { DashboardHeader } from "./DashboardHeader";
-import { sortAndDeduplicateEvents } from "./event-utils";
+import { leagueHasFavouriteTeam, sortAndDeduplicateEvents } from "./event-utils";
 import { EventSchedule } from "./EventSchedule";
 import { FilterCommandDialog } from "./FilterCommandDialog";
 import { LeagueSidebar } from "./LeagueSidebar";
@@ -12,6 +12,7 @@ import { useMutation, useQueries } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type { FavouriteTeam, FollowedLeague } from "#/lib/api/sports";
+import type { TeamFilter } from "./event-utils";
 
 type SportsDashboardProps = {
   userName: string;
@@ -35,19 +36,32 @@ export function SportsDashboard({
   const [isFilterDialogOpen, setFilterDialogOpen] = useState(false);
   const [activeLeagueId, setActiveLeagueId] = useState<string | null>(null);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+  const [teamFilter, setTeamFilter] = useState<TeamFilter>("favourites");
   useHotkey("Mod+K", () => setFilterDialogOpen((open) => !open), {
     enabled: !isDialogOpen && !isTeamDialogOpen,
     requireReset: true,
   });
-  const selectedTeam = favouriteTeams.find((team) => team.teamId === activeTeamId) ?? null;
-  const selectedLeagueId = leagues.some((league) => league.leagueId === activeLeagueId)
-    ? activeLeagueId
-    : null;
   const removeTeamMutation = useMutation({
     mutationFn: (teamId: string) =>
       saveFavouriteTeams(favouriteTeams.filter((team) => team.teamId !== teamId)),
     onSuccess: onTeamsChanged,
   });
+  const eventQueries = useQueries({
+    queries: leagues.map((league) => leagueEventsQuery(league.leagueId)),
+  });
+
+  const allEvents = sortAndDeduplicateEvents(eventQueries.flatMap((query) => query.data ?? []));
+  const selectedTeam = favouriteTeams.find((team) => team.teamId === activeTeamId) ?? null;
+  const selectedLeagueId = leagues.some((league) => league.leagueId === activeLeagueId)
+    ? activeLeagueId
+    : null;
+  const changeLeague = (leagueId: string | null) => {
+    setActiveLeagueId(leagueId);
+    if (leagueId && !leagueHasFavouriteTeam(leagueId, favouriteTeams, allEvents)) {
+      setTeamFilter("all");
+      setActiveTeamId(null);
+    }
+  };
   const teamProps = {
     teams: favouriteTeams,
     activeTeamId: selectedTeam?.teamId ?? null,
@@ -61,11 +75,6 @@ export function SportsDashboard({
     isSavingTeams: removeTeamMutation.isPending,
     hasTeamsError: removeTeamMutation.isError,
   };
-  const eventQueries = useQueries({
-    queries: leagues.map((league) => leagueEventsQuery(league.leagueId)),
-  });
-
-  const allEvents = sortAndDeduplicateEvents(eventQueries.flatMap((query) => query.data ?? []));
   const events = selectedLeagueId
     ? allEvents.filter((event) => event.idLeague === selectedLeagueId)
     : allEvents;
@@ -80,7 +89,7 @@ export function SportsDashboard({
           userName={userName}
           leagues={leagues}
           activeLeagueId={selectedLeagueId}
-          onLeagueChange={setActiveLeagueId}
+          onLeagueChange={changeLeague}
           onAddLeague={() => setDialogOpen(true)}
           onSignOut={onSignOut}
         />
@@ -91,7 +100,7 @@ export function SportsDashboard({
             onSearch={() => setFilterDialogOpen(true)}
             leagues={leagues}
             activeLeagueId={selectedLeagueId}
-            onLeagueChange={setActiveLeagueId}
+            onLeagueChange={changeLeague}
             onAddLeague={() => setDialogOpen(true)}
             onSignOut={onSignOut}
           />
@@ -100,6 +109,8 @@ export function SportsDashboard({
             favouriteTeams={favouriteTeams}
             selectedTeam={selectedTeam}
             onClearTeam={() => setActiveTeamId(null)}
+            teamFilter={teamFilter}
+            onTeamFilterChange={setTeamFilter}
             isLoading={isLoading}
             hasError={hasError}
             hasLeagues={Boolean(leagues.length)}
@@ -115,7 +126,7 @@ export function SportsDashboard({
         teams={favouriteTeams}
         activeLeagueId={selectedLeagueId}
         activeTeamId={selectedTeam?.teamId ?? null}
-        onLeagueChange={setActiveLeagueId}
+        onLeagueChange={changeLeague}
         onTeamChange={teamProps.onTeamChange}
         onClearTeam={() => setActiveTeamId(null)}
       />

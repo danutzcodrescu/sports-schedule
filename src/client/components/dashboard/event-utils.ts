@@ -1,4 +1,4 @@
-import type { SportsEvent } from "#/lib/api/sports";
+import type { FavouriteTeam, SportsEvent } from "#/lib/api/sports";
 
 export type ScheduleFilter = "upcoming" | "live" | "today" | "tomorrow";
 export type TeamFilter = "favourites" | "all";
@@ -100,6 +100,22 @@ export function filterEventsByTeams(
     (event) =>
       (event.idHomeTeam !== null && favouriteTeamIds.has(event.idHomeTeam)) ||
       (event.idAwayTeam !== null && favouriteTeamIds.has(event.idAwayTeam)),
+  );
+}
+
+export function leagueHasFavouriteTeam(
+  leagueId: string,
+  favouriteTeams: FavouriteTeam[],
+  events: SportsEvent[],
+) {
+  if (favouriteTeams.some((team) => team.leagueId === leagueId)) return true;
+
+  const favouriteTeamIds = new Set(favouriteTeams.map((team) => team.teamId));
+  return events.some(
+    (event) =>
+      event.idLeague === leagueId &&
+      ((event.idHomeTeam !== null && favouriteTeamIds.has(event.idHomeTeam)) ||
+        (event.idAwayTeam !== null && favouriteTeamIds.has(event.idAwayTeam))),
   );
 }
 
