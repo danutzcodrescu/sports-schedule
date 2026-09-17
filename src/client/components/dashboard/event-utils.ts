@@ -1,6 +1,7 @@
 import type { SportsEvent } from "#/lib/api/sports";
 
 export type ScheduleFilter = "upcoming" | "live" | "today" | "tomorrow";
+export type TeamFilter = "favourites" | "all";
 export type EventStatus = "live" | "upcoming" | "finished";
 export type EventGroup = { date: Date; events: SportsEvent[] };
 
@@ -87,6 +88,19 @@ export function filterEvents(events: SportsEvent[], filter: ScheduleFilter, now:
     }
     return status === "upcoming";
   });
+}
+
+export function filterEventsByTeams(
+  events: SportsEvent[],
+  filter: TeamFilter,
+  favouriteTeamIds: Set<string>,
+) {
+  if (filter === "all" || !favouriteTeamIds.size) return events;
+  return events.filter(
+    (event) =>
+      (event.idHomeTeam !== null && favouriteTeamIds.has(event.idHomeTeam)) ||
+      (event.idAwayTeam !== null && favouriteTeamIds.has(event.idAwayTeam)),
+  );
 }
 
 export function groupEventsByLocalDay(events: SportsEvent[]) {

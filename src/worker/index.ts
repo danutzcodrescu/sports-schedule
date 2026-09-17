@@ -1,5 +1,6 @@
 import { createAuth } from "./auth/auth";
 import { rateLimitApi, rateLimitAuth } from "./rate-limit";
+import { favouriteTeamsRoutes } from "./routes/favourite-teams";
 import { followedLeaguesRoutes } from "./routes/followed-leagues";
 import { sportsRoutes } from "./routes/sports";
 import { Hono } from "hono";
@@ -34,6 +35,7 @@ const app = new Hono<AppEnv>()
   .on(["GET", "POST"], "/api/auth/*", (c) => createAuth(c.env).handler(c.req.raw))
   .get("/api/health", (c) => c.json({ status: "ok" }))
   .route("/api/followed-leagues", followedLeaguesRoutes)
+  .route("/api/favourite-teams", favouriteTeamsRoutes)
   .route("/api/sports", sportsRoutes);
 
 app.onError((error, c) => {

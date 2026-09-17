@@ -1,6 +1,6 @@
 import { requireAuth } from "../auth/middleware";
 import { rateLimitSports } from "../rate-limit";
-import { createSportsDbUrl } from "../services/sportsdb";
+import { createSportsDbUrl, getLeagueTeams } from "../services/sportsdb";
 import { Hono } from "hono";
 
 import type { AppEnv } from "../auth/middleware";
@@ -13,17 +13,6 @@ type SportsResponse = {
     strSportThumb: string | null;
     strSportDescription: string | null;
   }>;
-};
-
-type TeamsResponse = {
-  teams: Array<{
-    idTeam: string;
-    strTeam: string;
-    strSport: string;
-    idLeague: string;
-    strLeague: string;
-    strBadge: string | null;
-  }> | null;
 };
 
 type EventsResponse = {
@@ -167,19 +156,14 @@ export const sportsRoutes = new Hono<AppEnv>()
       return c.json({ error: "Invalid league ID" }, 400);
     }
 
-    const result = await getCachedJson<TeamsResponse>(
-      c.env.SPORTS_CACHE,
-      `sportsdb:teams:${leagueId}:v1`,
-      leagueUrl(c.env.SPORTSDB_API_KEY, "lookup_all_teams.php", leagueId),
-      MONTH_IN_SECONDS,
-    );
-
-    if (!result) {
+    try {
+      const result = await getLeagueTeams(c.env.SPORTS_CACHE, c.env.SPORTSDB_API_KEY, leagueId);
+      c.header("X-Cache", result.status);
+      return c.json({ teams: result.teams });
+    } catch (error) {
+      console.error("Failed to fetch league teams", { leagueId, error });
       return c.json({ error: "TheSportsDB request failed" }, 502);
     }
-
-    c.header("X-Cache", result.status);
-    return c.json(result.data);
   })
   .get("/events/:leagueId", async (c) => {
     const leagueId = c.req.param("leagueId");

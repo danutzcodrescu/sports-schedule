@@ -36,6 +36,26 @@ export const leagueRelations = relations(league, ({ many }) => ({
   followers: many(followedLeague),
 }));
 
+export const favouriteTeam = sqliteTable(
+  "favourite_team",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    teamId: text("team_id").notNull(),
+    leagueId: text("league_id")
+      .notNull()
+      .references(() => league.id, { onDelete: "cascade" }),
+    teamName: text("team_name").notNull(),
+    country: text("country"),
+    badgeUrl: text("badge_url"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+      .notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.teamId] })],
+);
+
 export const userFollowedLeagueRelations = relations(user, ({ many }) => ({
   followedLeagues: many(followedLeague),
 }));

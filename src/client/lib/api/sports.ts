@@ -43,6 +43,41 @@ export type SportsEvent = {
   intRound: string | null;
 };
 
+export type Team = {
+  idTeam: string;
+  strTeam: string;
+  strCountry: string | null;
+  strBadge: string | null;
+};
+
+export type FavouriteTeam = {
+  teamId: string;
+  leagueId: string;
+  teamName: string;
+  country: string | null;
+  badgeUrl: string | null;
+};
+
+export async function getLeagueTeams(leagueId: string) {
+  const response = await getJson<{ teams: Team[] | null }>(
+    `/api/sports/teams/${encodeURIComponent(leagueId)}`,
+  );
+  return response.teams ?? [];
+}
+
+export async function getFavouriteTeams() {
+  const response = await getJson<{ teams: FavouriteTeam[] }>("/api/favourite-teams");
+  return response.teams;
+}
+
+export function saveFavouriteTeams(teams: FavouriteTeam[]) {
+  return getJson<{ saved: boolean }>("/api/favourite-teams", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ teams: teams.map(({ teamId, leagueId }) => ({ teamId, leagueId })) }),
+  });
+}
+
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { credentials: "same-origin", ...init });
 

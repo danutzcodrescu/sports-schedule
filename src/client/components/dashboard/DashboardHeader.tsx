@@ -7,6 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "#/components/ui/DropdownMenu";
+import { MyTeams } from "./MyTeams";
 import {
   ArrowDown01Icon,
   Logout01Icon,
@@ -17,8 +18,9 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 
 import type { FollowedLeague } from "#/lib/api/sports";
+import type { MyTeamsProps } from "./MyTeams";
 
-type DashboardHeaderProps = {
+type DashboardHeaderProps = MyTeamsProps & {
   leagues: FollowedLeague[];
   activeLeagueId: string | null;
   onLeagueChange: (leagueId: string | null) => void;
@@ -32,6 +34,7 @@ export function DashboardHeader({
   onLeagueChange,
   onAddLeague,
   onSignOut,
+  ...teamProps
 }: DashboardHeaderProps) {
   const activeLeague = leagues.find((league) => league.leagueId === activeLeagueId);
 
@@ -86,6 +89,14 @@ export function DashboardHeader({
           </DropdownMenu>
         </div>
       ) : null}
+      <details className="mt-3 rounded-lg border lg:hidden">
+        <summary className="touch-target cursor-pointer px-3 py-3 text-sm font-medium">
+          My teams · {teamProps.teams.length}
+        </summary>
+        <div className="border-t p-2">
+          <MyTeams {...teamProps} />
+        </div>
+      </details>
     </header>
   );
 }

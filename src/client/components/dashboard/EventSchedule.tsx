@@ -3,6 +3,7 @@ import { Button } from "#/components/ui/Button";
 import { SelectionButton } from "#/components/ui/SelectionButton";
 import {
   filterEvents,
+  filterEventsByTeams,
   formatDayHeading,
   getEventStatus,
   groupEventsByLocalDay,
@@ -12,14 +13,15 @@ import { EventCard } from "./EventCard";
 import {
   Calendar03Icon,
   Clock01Icon,
+  FavouriteIcon,
   PlusSignIcon,
   SparklesIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 
-import type { SportsEvent } from "#/lib/api/sports";
-import type { ScheduleFilter } from "./event-utils";
+import type { FavouriteTeam, SportsEvent } from "#/lib/api/sports";
+import type { ScheduleFilter, TeamFilter } from "./event-utils";
 
 const scheduleFilters = [
   { id: "upcoming", label: "Upcoming", icon: SparklesIcon },
@@ -30,6 +32,7 @@ const scheduleFilters = [
 
 type EventScheduleProps = {
   events: SportsEvent[];
+  favouriteTeams: FavouriteTeam[];
   isLoading: boolean;
   hasError: boolean;
   hasLeagues: boolean;
@@ -38,12 +41,14 @@ type EventScheduleProps = {
 
 export function EventSchedule({
   events,
+  favouriteTeams,
   isLoading,
   hasError,
   hasLeagues,
   onAddLeague,
 }: EventScheduleProps) {
   const [activeFilter, setActiveFilter] = useState<ScheduleFilter>("upcoming");
+  const [teamFilter, setTeamFilter] = useState<TeamFilter>("favourites");
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -55,24 +60,48 @@ export function EventSchedule({
     return () => document.removeEventListener("visibilitychange", updateCurrentTime);
   }, []);
 
-  const visibleEvents = filterEvents(events, activeFilter, now);
+  const teamEvents = filterEventsByTeams(
+    events,
+    teamFilter,
+    new Set(favouriteTeams.map((team) => team.teamId)),
+  );
+  const isFilteringTeams = teamFilter === "favourites" && favouriteTeams.length > 0;
+  const visibleEvents = filterEvents(teamEvents, activeFilter, now);
   const eventGroups = groupEventsByLocalDay(visibleEvents);
-  const liveCount = events.filter((event) => getEventStatus(event, now) === "live").length;
+  const liveCount = teamEvents.filter((event) => getEventStatus(event, now) === "live").length;
 
   return (
     <section className="page-padding">
-      <div className="filter-grid" role="group" aria-label="Schedule period">
-        {scheduleFilters.map((filter) => (
+      <div className="flex flex-col gap-3 @4xl/dashboard:flex-row @4xl/dashboard:items-center @4xl/dashboard:justify-between">
+        <div className="filter-grid" role="group" aria-label="Schedule period">
+          {scheduleFilters.map((filter) => (
+            <SelectionButton
+              key={filter.id}
+              aria-pressed={activeFilter === filter.id}
+              onClick={() => setActiveFilter(filter.id)}
+            >
+              <HugeiconsIcon icon={filter.icon} className="size-4" />
+              {filter.label}
+              {filter.id === "live" && liveCount ? <Badge variant="live">{liveCount}</Badge> : null}
+            </SelectionButton>
+          ))}
+        </div>
+        <div
+          className="grid grid-cols-2 gap-2 @xl/dashboard:flex"
+          role="group"
+          aria-label="Schedule teams"
+        >
           <SelectionButton
-            key={filter.id}
-            aria-pressed={activeFilter === filter.id}
-            onClick={() => setActiveFilter(filter.id)}
+            aria-pressed={teamFilter === "favourites"}
+            onClick={() => setTeamFilter("favourites")}
           >
-            <HugeiconsIcon icon={filter.icon} className="size-4" />
-            {filter.label}
-            {filter.id === "live" && liveCount ? <Badge variant="live">{liveCount}</Badge> : null}
+            <HugeiconsIcon icon={FavouriteIcon} className="size-4" />
+            Favourites
           </SelectionButton>
-        ))}
+          <SelectionButton aria-pressed={teamFilter === "all"} onClick={() => setTeamFilter("all")}>
+            All
+          </SelectionButton>
+        </div>
       </div>
 
       <div className="panel @container/schedule mt-4 p-4 @2xl/dashboard:mt-6 @2xl/dashboard:min-h-schedule @2xl/dashboard:p-6">
@@ -83,6 +112,7 @@ export function EventSchedule({
               {isLoading
                 ? "Loading events..."
                 : `${visibleEvents.length} scheduled ${visibleEvents.length === 1 ? "event" : "events"}`}
+              {isFilteringTeams ? " · Favourite teams" : ""}
             </p>
           </div>
           <Badge>Your local time</Badge>
@@ -118,6 +148,8 @@ export function EventSchedule({
             hasError={hasError}
             hasLeagues={hasLeagues}
             onAddLeague={onAddLeague}
+            isFilteringTeams={isFilteringTeams}
+            onShowAll={() => setTeamFilter("all")}
           />
         )}
       </div>
@@ -140,11 +172,15 @@ function EventEmptyState({
   hasError,
   hasLeagues,
   onAddLeague,
+  isFilteringTeams,
+  onShowAll,
 }: {
   activeFilter: ScheduleFilter;
   hasError: boolean;
   hasLeagues: boolean;
   onAddLeague: () => void;
+  isFilteringTeams: boolean;
+  onShowAll: () => void;
 }) {
   return (
     <div className="empty-state">
@@ -159,13 +195,20 @@ function EventEmptyState({
           {hasError
             ? "The schedule service is unavailable right now. Try again shortly."
             : hasLeagues
-              ? "There are no matching events in your followed leagues."
+              ? isFilteringTeams
+                ? "Your favourite teams have no matching events in the selected leagues."
+                : "There are no matching events in your followed leagues."
               : "Follow a league to populate your personal sports schedule."}
         </p>
         {!hasLeagues ? (
           <Button className="mt-6" onClick={onAddLeague}>
             <HugeiconsIcon icon={PlusSignIcon} />
             Add a league
+          </Button>
+        ) : null}
+        {hasLeagues && isFilteringTeams && !hasError ? (
+          <Button variant="outline" className="mt-6" onClick={onShowAll}>
+            Show all teams
           </Button>
         ) : null}
       </div>

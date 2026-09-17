@@ -18,6 +18,7 @@
     "db:studio": "drizzle-kit studio",
     "auth:generate": "pnpm dlx auth@latest generate --adapter drizzle --dialect sqlite --config ./src/worker/auth/auth.ts --output ./src/worker/db/auth-schema.ts -y",
     "lint": "oxlint",
+    "test": "node --test src/client/components/dashboard/event-utils.test.ts src/worker/services/sportsdb.test.ts",
     "lint:fix": "oxlint --fix",
     "format": "oxfmt --write",
     "format:check": "oxfmt --check"

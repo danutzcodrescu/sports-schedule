@@ -50,6 +50,15 @@ with text or semantics as well as color.
   on phones and wrap into a row when that container has enough room. The sidebar
   starts at `lg`; phones and tablets use a full-width league menu with badges,
   radio selection, keyboard navigation, and a scrollable popup.
+- The sidebar is a size container: compact league rows use 24px icon surfaces,
+  12px labels, and no inter-row gap. Height queries reduce padding on short screens;
+  independently capped league and team lists keep My Teams accessible beneath leagues.
+  Touch controls retain the shared coarse-pointer target size. On mobile, My Teams
+  is available in an expandable section beneath the league menu.
+- The team picker uses the same two-step dialog pattern as leagues. Selections are
+  retained when changing leagues and saved together on Done. Favourites/All is an
+  independent schedule filter, defaults to Favourites, and falls back to all teams
+  when no favourites exist.
 - The schedule panel is a `schedule` container. Event grids use the standard
   `2xl` and `5xl` container sizes for two and three columns, independent of the
   viewport or sidebar. Loading cards share the same grid and size recipes.

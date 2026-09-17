@@ -154,6 +154,33 @@
   .filter-grid {
     @apply grid grid-cols-2 gap-2 @xl/dashboard:flex @xl/dashboard:flex-wrap;
   }
+  .league-sidebar {
+    container: sidebar / size;
+  }
+  .sidebar-leagues {
+    max-block-size: 52cqh;
+  }
+  .league-sidebar .sidebar-teams {
+    max-block-size: 24cqh;
+  }
+  @container sidebar (height < 48rem) {
+    .sidebar-brand {
+      @apply px-4 py-3;
+    }
+    .sidebar-content,
+    .sidebar-footer {
+      @apply p-2;
+    }
+    .sidebar-team-section {
+      @apply mt-2 pt-2;
+    }
+    .sidebar-team-empty {
+      @apply gap-2 py-2;
+    }
+    .sidebar-leagues {
+      max-block-size: 44cqh;
+    }
+  }
   .safe-area {
     padding-top: env(safe-area-inset-top);
     padding-right: env(safe-area-inset-right);

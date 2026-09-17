@@ -20,6 +20,34 @@ type LeagueLookupResponse = {
 const SPORTS_DB_BASE_URL = "https://www.thesportsdb.com/api/v1/json";
 const MONTH_IN_SECONDS = 60 * 60 * 24 * 30;
 
+export type TeamDetails = {
+  idTeam: string;
+  strTeam: string;
+  strSport: string;
+  idLeague: string;
+  strLeague: string;
+  strCountry: string | null;
+  strBadge: string | null;
+};
+
+export async function getLeagueTeams(cache: KVNamespace, apiKey: string, leagueId: string) {
+  const cacheKey = `sportsdb:teams:${leagueId}:v2`;
+  const cached = await cache.get<{ teams: TeamDetails[] | null }>(cacheKey, "json");
+  if (cached) return { teams: cached.teams ?? [], status: "HIT" };
+
+  // The list endpoint accepts league IDs via `id`; `l` is for league names.
+  const url = createSportsDbUrl(apiKey, "search_all_teams.php");
+  url.searchParams.set("id", leagueId);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`TheSportsDB request failed with status ${response.status}`);
+  }
+
+  const body = (await response.json()) as { teams: TeamDetails[] | null };
+  await cache.put(cacheKey, JSON.stringify(body), { expirationTtl: MONTH_IN_SECONDS });
+  return { teams: body.teams ?? [], status: "MISS" };
+}
+
 export function createSportsDbUrl(apiKey: string, endpoint: string) {
   return new URL(`${SPORTS_DB_BASE_URL}/${encodeURIComponent(apiKey)}/${endpoint}`);
 }
