@@ -19,6 +19,31 @@ type LeagueLookupResponse = {
 
 const SPORTS_DB_BASE_URL = "https://www.thesportsdb.com/api/v1/json";
 const MONTH_IN_SECONDS = 60 * 60 * 24 * 30;
+const THREE_DAYS_IN_SECONDS = 60 * 60 * 24 * 3;
+
+export type EventsResponse = {
+  events: Array<{
+    idEvent: string;
+    strEvent: string;
+    strSport: string;
+    idLeague: string;
+    strLeague: string;
+    strSeason: string | null;
+    dateEvent: string;
+    strTime: string | null;
+    strTimestamp: string | null;
+    idHomeTeam: string | null;
+    strHomeTeam: string | null;
+    strHomeTeamBadge: string | null;
+    idAwayTeam: string | null;
+    strAwayTeam: string | null;
+    strAwayTeamBadge: string | null;
+    strThumb: string | null;
+    strVenue: string | null;
+    intRound: string | null;
+    strStatus: string | null;
+  }> | null;
+};
 
 export type TeamDetails = {
   idTeam: string;
@@ -50,6 +75,27 @@ export async function getLeagueTeams(cache: KVNamespace, apiKey: string, leagueI
 
 export function createSportsDbUrl(apiKey: string, endpoint: string) {
   return new URL(`${SPORTS_DB_BASE_URL}/${encodeURIComponent(apiKey)}/${endpoint}`);
+}
+
+export function leagueEventsCacheKey(leagueId: string) {
+  return `sportsdb:events:${leagueId}:v1`;
+}
+
+export async function refreshLeagueEvents(cache: KVNamespace, apiKey: string, leagueId: string) {
+  const url = createSportsDbUrl(apiKey, "eventsnextleague.php");
+  url.searchParams.set("id", leagueId);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`TheSportsDB request failed with status ${response.status}`);
+  }
+
+  const data = (await response.json()) as EventsResponse;
+  await cache.put(leagueEventsCacheKey(leagueId), JSON.stringify(data), {
+    expirationTtl: THREE_DAYS_IN_SECONDS,
+  });
+
+  return data;
 }
 
 export async function getLeagueDetails(cache: KVNamespace, apiKey: string, leagueId: string) {

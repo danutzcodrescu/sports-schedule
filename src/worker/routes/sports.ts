@@ -1,9 +1,10 @@
 import { requireAuth } from "../auth/middleware";
 import { rateLimitSports } from "../rate-limit";
-import { createSportsDbUrl, getLeagueTeams } from "../services/sportsdb";
+import { createSportsDbUrl, getLeagueTeams, leagueEventsCacheKey } from "../services/sportsdb";
 import { Hono } from "hono";
 
 import type { AppEnv } from "../auth/middleware";
+import type { EventsResponse } from "../services/sportsdb";
 
 type SportsResponse = {
   sports: Array<{
@@ -13,30 +14,6 @@ type SportsResponse = {
     strSportThumb: string | null;
     strSportDescription: string | null;
   }>;
-};
-
-type EventsResponse = {
-  events: Array<{
-    idEvent: string;
-    strEvent: string;
-    strSport: string;
-    idLeague: string;
-    strLeague: string;
-    strSeason: string | null;
-    dateEvent: string;
-    strTime: string | null;
-    strTimestamp: string | null;
-    idHomeTeam: string | null;
-    strHomeTeam: string | null;
-    strHomeTeamBadge: string | null;
-    idAwayTeam: string | null;
-    strAwayTeam: string | null;
-    strAwayTeamBadge: string | null;
-    strThumb: string | null;
-    strVenue: string | null;
-    intRound: string | null;
-    strStatus: string | null;
-  }> | null;
 };
 
 type LeaguesResponse = {
@@ -175,7 +152,7 @@ export const sportsRoutes = new Hono<AppEnv>()
 
     const result = await getCachedJson<EventsResponse>(
       c.env.SPORTS_CACHE,
-      `sportsdb:events:${leagueId}:v1`,
+      leagueEventsCacheKey(leagueId),
       leagueUrl(c.env.SPORTSDB_API_KEY, "eventsnextleague.php", leagueId),
       THREE_DAYS_IN_SECONDS,
     );

@@ -1,4 +1,5 @@
 import { createAuth } from "./auth/auth";
+import { refreshEventCaches } from "./jobs/refresh-event-caches";
 import { rateLimitApi, rateLimitAuth } from "./rate-limit";
 import { favouriteTeamsRoutes } from "./routes/favourite-teams";
 import { followedLeaguesRoutes } from "./routes/followed-leagues";
@@ -48,5 +49,10 @@ app.onError((error, c) => {
   return c.json({ error: "Internal server error" }, 500);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  async scheduled(_controller, env, _ctx) {
+    await refreshEventCaches(env);
+  },
+} satisfies ExportedHandler<CloudflareBindings>;
 export type AppType = typeof app;
