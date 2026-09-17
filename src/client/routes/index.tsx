@@ -1,5 +1,6 @@
 import { SportsDashboard } from "#/components/dashboard/SportsDashboard";
 import { getFavouriteTeams, getFollowedLeagues } from "#/lib/api/sports";
+import { leagueEventsQuery } from "#/lib/api/sports-queries";
 import { authClient } from "#/lib/auth/auth.ts";
 import { queryOptions, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
@@ -29,17 +30,19 @@ export const Route = createFileRoute("/")({
 
     return { session };
   },
-  loader: ({ context }) =>
-    Promise.all([
-      context.queryClient.query({
-        ...followedLeaguesQuery(context.session.user.id),
-        staleTime: "static",
-      }),
-      context.queryClient.query({
-        ...favouriteTeamsQuery(context.session.user.id),
-        staleTime: "static",
-      }),
-    ]),
+  loader: async ({ context }) => {
+    const [leagues] = await Promise.all([
+      context.queryClient.query(followedLeaguesQuery(context.session.user.id)),
+      context.queryClient.query(favouriteTeamsQuery(context.session.user.id)),
+    ]);
+
+    // Favourites can play in multiple followed competitions, so warm every league's schedule.
+    await Promise.all(
+      leagues.map((league) =>
+        context.queryClient.query(leagueEventsQuery(league.leagueId)).catch(() => undefined),
+      ),
+    );
+  },
 });
 
 function Home() {

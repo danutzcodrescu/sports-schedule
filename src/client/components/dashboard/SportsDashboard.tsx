@@ -1,4 +1,5 @@
-import { getLeagueEvents, saveFavouriteTeams } from "#/lib/api/sports";
+import { saveFavouriteTeams } from "#/lib/api/sports";
+import { leagueEventsQuery } from "#/lib/api/sports-queries";
 import { AddLeagueDialog } from "./AddLeagueDialog";
 import { AddTeamDialog } from "./AddTeamDialog";
 import { DashboardHeader } from "./DashboardHeader";
@@ -49,11 +50,7 @@ export function SportsDashboard({
     hasTeamsError: removeTeamMutation.isError,
   };
   const eventQueries = useQueries({
-    queries: leagues.map((league) => ({
-      queryKey: ["league-events", league.leagueId],
-      queryFn: () => getLeagueEvents(league.leagueId),
-      staleTime: 5 * 60 * 1000,
-    })),
+    queries: leagues.map((league) => leagueEventsQuery(league.leagueId)),
   });
 
   const allEvents = sortAndDeduplicateEvents(eventQueries.flatMap((query) => query.data ?? []));
