@@ -49,6 +49,17 @@ export function DashboardHeader({
           <p className="eyebrow mb-1 text-primary">Personal schedule</p>
           <h1 className="page-title">{activeLeague?.leagueName || "Your sports timeline"}</h1>
         </div>
+        <Button
+          variant="outline"
+          className="hidden shrink-0 self-end lg:inline-flex"
+          onClick={onSearch}
+        >
+          <HugeiconsIcon icon={Search01Icon} className="size-4" />
+          <span>Find a league or team</span>
+          <kbd className="ml-3 rounded border bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+            {formatForDisplay("Mod+K")}
+          </kbd>
+        </Button>
         <div className="flex shrink-0 items-center gap-2 lg:hidden">
           <Button variant="outline" size="icon" onClick={onAddLeague} aria-label="Add a league">
             <HugeiconsIcon icon={PlusSignIcon} />
@@ -58,18 +69,6 @@ export function DashboardHeader({
           </Button>
         </div>
       </div>
-
-      <Button
-        variant="outline"
-        className="mt-4 w-full justify-start @xl/dashboard:w-auto"
-        onClick={onSearch}
-      >
-        <HugeiconsIcon icon={Search01Icon} className="size-4" />
-        <span className="flex-1 text-left">Find a league or team</span>
-        <kbd className="ml-3 rounded border bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-          {formatForDisplay("Mod+K")}
-        </kbd>
-      </Button>
 
       {leagues.length ? (
         <div className="mt-4 lg:hidden">
