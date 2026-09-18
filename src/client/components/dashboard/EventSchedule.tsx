@@ -8,6 +8,7 @@ import {
   getEventStatus,
   groupEventsByLocalDay,
   localDayKey,
+  shouldFallBackToAllTeams,
 } from "./event-utils";
 import { EventCard } from "./EventCard";
 import {
@@ -67,16 +68,30 @@ export function EventSchedule({
     return () => document.removeEventListener("visibilitychange", updateCurrentTime);
   }, []);
 
+  const favouriteTeamIds = new Set(favouriteTeams.map((team) => team.teamId));
+  const selectedTeamIds = new Set(selectedTeam ? [selectedTeam.teamId] : favouriteTeamIds);
   const teamEvents = filterEventsByTeams(
     events,
     selectedTeam ? "favourites" : teamFilter,
-    new Set(selectedTeam ? [selectedTeam.teamId] : favouriteTeams.map((team) => team.teamId)),
+    selectedTeamIds,
   );
   const isFilteringTeams =
     Boolean(selectedTeam) || (teamFilter === "favourites" && favouriteTeams.length > 0);
   const changeTeamFilter = (filter: TeamFilter) => {
     onTeamFilterChange(filter);
     onClearTeam();
+  };
+  const changeScheduleFilter = (filter: ScheduleFilter) => {
+    setActiveFilter(filter);
+    if (
+      !isLoading &&
+      !hasError &&
+      !selectedTeam &&
+      teamFilter === "favourites" &&
+      shouldFallBackToAllTeams(events, filter, favouriteTeamIds, now)
+    ) {
+      changeTeamFilter("all");
+    }
   };
   const visibleEvents = filterEvents(teamEvents, activeFilter, now);
   const eventGroups = groupEventsByLocalDay(visibleEvents);
@@ -90,7 +105,7 @@ export function EventSchedule({
             <SelectionButton
               key={filter.id}
               aria-pressed={activeFilter === filter.id}
-              onClick={() => setActiveFilter(filter.id)}
+              onClick={() => changeScheduleFilter(filter.id)}
             >
               <HugeiconsIcon icon={filter.icon} className="size-4" />
               {filter.label}

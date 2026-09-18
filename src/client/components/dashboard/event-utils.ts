@@ -103,6 +103,17 @@ export function filterEventsByTeams(
   );
 }
 
+export function shouldFallBackToAllTeams(
+  events: SportsEvent[],
+  filter: ScheduleFilter,
+  favouriteTeamIds: Set<string>,
+  now: Date,
+) {
+  if (filter === "upcoming" || !favouriteTeamIds.size) return false;
+  const favouriteEvents = filterEventsByTeams(events, "favourites", favouriteTeamIds);
+  return filterEvents(favouriteEvents, filter, now).length === 0;
+}
+
 export function leagueHasFavouriteTeam(
   leagueId: string,
   favouriteTeams: FavouriteTeam[],

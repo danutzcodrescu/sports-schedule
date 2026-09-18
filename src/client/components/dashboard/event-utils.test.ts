@@ -1,4 +1,9 @@
-import { filterEvents, filterEventsByTeams, leagueHasFavouriteTeam } from "./event-utils.ts";
+import {
+  filterEvents,
+  filterEventsByTeams,
+  leagueHasFavouriteTeam,
+  shouldFallBackToAllTeams,
+} from "./event-utils.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -82,6 +87,30 @@ test("favourite filtering composes with Today, Live, Upcoming, and Tomorrow", ()
   assert.deepEqual(ids("upcoming"), ["upcoming", "tomorrow"]);
   assert.deepEqual(ids("today"), ["live", "upcoming"]);
   assert.deepEqual(ids("tomorrow"), ["tomorrow"]);
+});
+
+test("falls back to all teams when a selected period has no favourite events", () => {
+  const events = [
+    event("live", { idHomeTeam: "30", strTimestamp: liveStart }),
+    event("today", { idHomeTeam: "30" }),
+    event("tomorrow", {
+      idHomeTeam: "30",
+      strTimestamp: new Date(2026, 8, 17, 13).toISOString(),
+    }),
+  ];
+  const favourites = new Set(["10"]);
+
+  assert.equal(shouldFallBackToAllTeams(events, "live", favourites, now), true);
+  assert.equal(shouldFallBackToAllTeams(events, "today", favourites, now), true);
+  assert.equal(shouldFallBackToAllTeams(events, "tomorrow", favourites, now), true);
+  assert.equal(shouldFallBackToAllTeams(events, "upcoming", favourites, now), false);
+});
+
+test("keeps favourites when the selected period has a favourite event", () => {
+  const favourites = new Set(["10"]);
+
+  assert.equal(shouldFallBackToAllTeams([event("today")], "today", favourites, now), false);
+  assert.equal(shouldFallBackToAllTeams([], "today", new Set(), now), false);
 });
 
 test("removing the last favourite restores all events", () => {
