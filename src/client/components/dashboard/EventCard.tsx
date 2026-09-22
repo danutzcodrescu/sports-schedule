@@ -111,8 +111,10 @@ function TeamRow({
         )}
       </span>
       <span className="min-w-0 flex-1 text-base font-semibold wrap-anywhere">{name}</span>
-      {score !== null && score !== undefined ? (
-        <span className="shrink-0 text-xl font-semibold text-live tabular-nums">{score}</span>
+      {score !== undefined ? (
+        <span className="shrink-0 text-xl font-semibold text-live tabular-nums">
+          {score ?? "0"}
+        </span>
       ) : null}
     </div>
   );
