@@ -43,6 +43,13 @@ export type SportsEvent = {
   intRound: string | null;
 };
 
+export type LiveScore = {
+  idEvent: string;
+  intHomeScore: string | null;
+  intAwayScore: string | null;
+  strStatus: string | null;
+};
+
 export type Team = {
   idTeam: string;
   strTeam: string;
@@ -110,6 +117,14 @@ export async function getLeagueEvents(leagueId: string) {
     `/api/sports/events/${encodeURIComponent(leagueId)}`,
   );
   return response.events ?? [];
+}
+
+export async function getEventScore(eventId: string, signal?: AbortSignal) {
+  const response = await getJson<{ score: LiveScore | null }>(
+    `/api/sports/livescores/${encodeURIComponent(eventId)}`,
+    { signal, cache: "no-store" },
+  );
+  return response.score;
 }
 
 export function followLeague(leagueId: string) {

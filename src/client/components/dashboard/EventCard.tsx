@@ -3,21 +3,24 @@ import { getEventStart, getEventStatus } from "./event-utils";
 import { TrophyIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
-import type { SportsEvent } from "#/lib/api/sports";
+import type { LiveScore, SportsEvent } from "#/lib/api/sports";
 
 type EventCardProps = {
   event: SportsEvent;
   now: Date;
+  liveScore?: LiveScore;
 };
 
-export function EventCard({ event, now }: EventCardProps) {
+export function EventCard({ event, now, liveScore }: EventCardProps) {
   const start = getEventStart(event);
   const status = getEventStatus(event, now);
+  const currentLiveScore = status === "live" ? liveScore : undefined;
   const hasTeams = Boolean(event.strHomeTeam || event.strAwayTeam);
   const time = new Intl.DateTimeFormat(undefined, {
     hour: "2-digit",
     minute: "2-digit",
   }).format(start);
+  const liveStatus = currentLiveScore?.strStatus || "live";
 
   return (
     <article
@@ -52,8 +55,16 @@ export function EventCard({ event, now }: EventCardProps) {
         <div className="flex flex-1 flex-col justify-center py-4 @2xl/schedule:py-6">
           {hasTeams ? (
             <div className="space-y-4">
-              <TeamRow name={event.strHomeTeam} badge={event.strHomeTeamBadge} />
-              <TeamRow name={event.strAwayTeam} badge={event.strAwayTeamBadge} />
+              <TeamRow
+                name={event.strHomeTeam}
+                badge={event.strHomeTeamBadge}
+                score={currentLiveScore?.intHomeScore}
+              />
+              <TeamRow
+                name={event.strAwayTeam}
+                badge={event.strAwayTeamBadge}
+                score={currentLiveScore?.intAwayScore}
+              />
             </div>
           ) : (
             <div>
@@ -71,7 +82,7 @@ export function EventCard({ event, now }: EventCardProps) {
             className="capitalize"
             variant={status === "live" ? "live" : status === "finished" ? "default" : "accent"}
           >
-            {status}
+            {status === "live" ? liveStatus : status}
           </Badge>
         </div>
       </div>
@@ -79,7 +90,15 @@ export function EventCard({ event, now }: EventCardProps) {
   );
 }
 
-function TeamRow({ name, badge }: { name: string | null; badge: string | null }) {
+function TeamRow({
+  name,
+  badge,
+  score,
+}: {
+  name: string | null;
+  badge: string | null;
+  score?: string | null;
+}) {
   if (!name) return null;
 
   return (
@@ -91,7 +110,10 @@ function TeamRow({ name, badge }: { name: string | null; badge: string | null })
           <HugeiconsIcon icon={TrophyIcon} className="size-5" />
         )}
       </span>
-      <span className="min-w-0 text-base font-semibold wrap-anywhere">{name}</span>
+      <span className="min-w-0 flex-1 text-base font-semibold wrap-anywhere">{name}</span>
+      {score !== null && score !== undefined ? (
+        <span className="shrink-0 text-xl font-semibold text-live tabular-nums">{score}</span>
+      ) : null}
     </div>
   );
 }

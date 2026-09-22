@@ -1,4 +1,4 @@
-import { getLeagueTeams, refreshLeagueEvents } from "./sportsdb.ts";
+import { getEventScore, getLeagueTeams, refreshLeagueEvents } from "./sportsdb.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -69,4 +69,35 @@ test("league event refresh preserves cached data when the upstream request fails
     /TheSportsDB request failed with status 503/,
   );
   assert.equal(entries.get("sportsdb:events:4335:v1"), staleValue);
+});
+
+test("event scores look up only the requested ID without caching or returning event metadata", async (context) => {
+  const score = { idEvent: "123", intHomeScore: "1", intAwayScore: "0", strStatus: "2H" };
+  const fetchMock = context.mock.method(
+    globalThis,
+    "fetch",
+    async (input: URL, init?: RequestInit) => {
+      assert.equal(input.pathname, "/api/v1/json/test-key/lookupevent.php");
+      assert.equal(input.search, "?id=123");
+      assert.equal(init?.cache, "no-store");
+      return Response.json({ events: [{ ...score, strEvent: "Home vs Away" }] });
+    },
+  );
+
+  assert.deepEqual(await getEventScore("test-key", "123"), score);
+  assert.deepEqual(await getEventScore("test-key", "123"), score);
+  assert.equal(fetchMock.mock.callCount(), 2);
+});
+
+test("event score lookup returns null for missing events and rejects upstream failures", async (context) => {
+  const fetchMock = context.mock.method(globalThis, "fetch", async () =>
+    Response.json({ events: null }),
+  );
+  assert.equal(await getEventScore("test-key", "123"), null);
+  fetchMock.mock.mockImplementation(async () =>
+    Response.json({ events: [{ idEvent: "456", intHomeScore: "9" }] }),
+  );
+  assert.equal(await getEventScore("test-key", "123"), null);
+  fetchMock.mock.mockImplementation(async () => new Response(null, { status: 503 }));
+  await assert.rejects(getEventScore("test-key", "123"), /status 503/);
 });

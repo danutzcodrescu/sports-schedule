@@ -1,6 +1,7 @@
 import {
   filterEvents,
   filterEventsByTeams,
+  getEventStatus,
   leagueHasFavouriteTeam,
   shouldFallBackToAllTeams,
 } from "./event-utils.ts";
@@ -128,4 +129,15 @@ test("detects whether a league contains a favourite team", () => {
   assert.equal(leagueHasFavouriteTeam("1", favourites, []), true);
   assert.equal(leagueHasFavouriteTeam("2", favourites, events), true);
   assert.equal(leagueHasFavouriteTeam("3", favourites, events), false);
+});
+
+test("marks an event live only during its estimated playing window", () => {
+  const soccerEvent = event("live-window", {
+    strTimestamp: new Date("2026-09-16T10:00:00Z").toISOString(),
+  });
+
+  assert.equal(getEventStatus(soccerEvent, new Date("2026-09-16T09:59:59Z")), "upcoming");
+  assert.equal(getEventStatus(soccerEvent, new Date("2026-09-16T10:00:00Z")), "live");
+  assert.equal(getEventStatus(soccerEvent, new Date("2026-09-16T12:14:59Z")), "live");
+  assert.equal(getEventStatus(soccerEvent, new Date("2026-09-16T12:15:00Z")), "finished");
 });

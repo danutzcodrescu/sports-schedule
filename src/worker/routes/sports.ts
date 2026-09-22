@@ -1,6 +1,11 @@
 import { requireAuth } from "../auth/middleware";
 import { rateLimitSports } from "../rate-limit";
-import { createSportsDbUrl, getLeagueTeams, leagueEventsCacheKey } from "../services/sportsdb";
+import {
+  createSportsDbUrl,
+  getLeagueTeams,
+  getEventScore,
+  leagueEventsCacheKey,
+} from "../services/sportsdb";
 import { Hono } from "hono";
 
 import type { AppEnv } from "../auth/middleware";
@@ -139,6 +144,21 @@ export const sportsRoutes = new Hono<AppEnv>()
       return c.json({ teams: result.teams });
     } catch (error) {
       console.error("Failed to fetch league teams", { leagueId, error });
+      return c.json({ error: "TheSportsDB request failed" }, 502);
+    }
+  })
+  .get("/livescores/:eventId", async (c) => {
+    c.header("Cache-Control", "no-store");
+    const eventId = c.req.param("eventId");
+    if (!/^\d+$/.test(eventId)) {
+      return c.json({ error: "Invalid event ID" }, 400);
+    }
+
+    try {
+      const score = await getEventScore(c.env.SPORTSDB_API_KEY, eventId);
+      return c.json({ score });
+    } catch (error) {
+      console.error("Failed to fetch event score", { eventId, error });
       return c.json({ error: "TheSportsDB request failed" }, 502);
     }
   })

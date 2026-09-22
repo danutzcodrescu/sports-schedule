@@ -45,6 +45,13 @@ export type EventsResponse = {
   }> | null;
 };
 
+export type LiveScore = {
+  idEvent: string;
+  intHomeScore: string | null;
+  intAwayScore: string | null;
+  strStatus: string | null;
+};
+
 export type TeamDetails = {
   idTeam: string;
   strTeam: string;
@@ -75,6 +82,27 @@ export async function getLeagueTeams(cache: KVNamespace, apiKey: string, leagueI
 
 export function createSportsDbUrl(apiKey: string, endpoint: string) {
   return new URL(`${SPORTS_DB_BASE_URL}/${encodeURIComponent(apiKey)}/${endpoint}`);
+}
+
+export async function getEventScore(apiKey: string, eventId: string) {
+  const url = createSportsDbUrl(apiKey, "lookupevent.php");
+  url.searchParams.set("id", eventId);
+  const response = await fetch(url, { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error(`TheSportsDB request failed with status ${response.status}`);
+  }
+
+  const body = (await response.json()) as { events: LiveScore[] | null };
+  const event = body.events?.find((item) => item.idEvent === eventId);
+  if (!event) return null;
+
+  return {
+    idEvent: event.idEvent,
+    intHomeScore: event.intHomeScore ?? null,
+    intAwayScore: event.intAwayScore ?? null,
+    strStatus: event.strStatus ?? null,
+  };
 }
 
 export function leagueEventsCacheKey(leagueId: string) {

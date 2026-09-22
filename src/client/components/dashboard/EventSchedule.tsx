@@ -1,6 +1,7 @@
 import { Badge } from "#/components/ui/Badge";
 import { Button } from "#/components/ui/Button";
 import { SelectionButton } from "#/components/ui/SelectionButton";
+import { eventScoreQuery } from "#/lib/api/sports-queries";
 import {
   filterEvents,
   filterEventsByTeams,
@@ -19,6 +20,7 @@ import {
   SparklesIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { focusManager, useQueries } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import type { FavouriteTeam, SportsEvent } from "#/lib/api/sports";
@@ -30,6 +32,8 @@ const scheduleFilters = [
   { id: "today", label: "Today", icon: Calendar03Icon },
   { id: "tomorrow", label: "Tomorrow", icon: Clock01Icon },
 ] as const;
+
+const LIVE_SCORE_POLL_INTERVAL = 60 * 1000;
 
 type EventScheduleProps = {
   events: SportsEvent[];
@@ -57,16 +61,7 @@ export function EventSchedule({
   onAddLeague,
 }: EventScheduleProps) {
   const [activeFilter, setActiveFilter] = useState<ScheduleFilter>("upcoming");
-  const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    const updateCurrentTime = () => {
-      if (document.visibilityState === "visible") setNow(new Date());
-    };
-
-    document.addEventListener("visibilitychange", updateCurrentTime);
-    return () => document.removeEventListener("visibilitychange", updateCurrentTime);
-  }, []);
+  const { now, isWindowFocused } = useFocusedClock();
 
   const favouriteTeamIds = new Set(favouriteTeams.map((team) => team.teamId));
   const selectedTeamIds = new Set(selectedTeam ? [selectedTeam.teamId] : favouriteTeamIds);
@@ -94,8 +89,20 @@ export function EventSchedule({
     }
   };
   const visibleEvents = filterEvents(teamEvents, activeFilter, now);
+  const liveScores = useQueries({
+    queries: (isLoading ? [] : visibleEvents)
+      .filter((event) => getEventStatus(event, now) === "live")
+      .map((event) => ({
+        ...eventScoreQuery(event.idEvent),
+        enabled: isWindowFocused,
+        refetchInterval: LIVE_SCORE_POLL_INTERVAL,
+      })),
+  });
   const eventGroups = groupEventsByLocalDay(visibleEvents);
   const liveCount = teamEvents.filter((event) => getEventStatus(event, now) === "live").length;
+  const liveScoresByEvent = new Map(
+    liveScores.flatMap(({ data }) => (data ? [[data.idEvent, data] as const] : [])),
+  );
 
   return (
     <section className="page-padding">
@@ -170,7 +177,12 @@ export function EventSchedule({
                 </div>
                 <div className="event-grid">
                   {group.events.map((event) => (
-                    <EventCard key={event.idEvent} event={event} now={now} />
+                    <EventCard
+                      key={event.idEvent}
+                      event={event}
+                      now={now}
+                      liveScore={liveScoresByEvent.get(event.idEvent)}
+                    />
                   ))}
                 </div>
               </section>
@@ -190,6 +202,32 @@ export function EventSchedule({
       </div>
     </section>
   );
+}
+
+function useFocusedClock() {
+  const [clock, setClock] = useState(() => ({
+    now: new Date(),
+    isWindowFocused: focusManager.isFocused(),
+  }));
+
+  useEffect(() => {
+    const unsubscribe = focusManager.subscribe((isWindowFocused) => {
+      setClock((current) => ({
+        now: isWindowFocused ? new Date() : current.now,
+        isWindowFocused,
+      }));
+    });
+    const interval = window.setInterval(() => {
+      if (focusManager.isFocused()) setClock({ now: new Date(), isWindowFocused: true });
+    }, LIVE_SCORE_POLL_INTERVAL);
+
+    return () => {
+      window.clearInterval(interval);
+      unsubscribe();
+    };
+  }, []);
+
+  return clock;
 }
 
 function EventLoadingState() {
