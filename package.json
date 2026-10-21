@@ -18,7 +18,9 @@
     "db:studio": "drizzle-kit studio",
     "auth:generate": "pnpm dlx auth@latest generate --adapter drizzle --dialect sqlite --config ./src/worker/auth/auth.ts --output ./src/worker/db/auth-schema.ts -y",
     "lint": "oxlint",
-    "test": "node --test src/client/components/dashboard/event-utils.test.ts src/worker/services/sportsdb.test.ts",
+    "test": "pnpm run test:node && pnpm run test:app",
+    "test:node": "node --test src/client/components/dashboard/event-utils.test.ts src/worker/services/sportsdb.test.ts",
+    "test:app": "vitest run",
     "lint:fix": "oxlint --fix",
     "format": "oxfmt --write",
     "format:check": "oxfmt --check"
@@ -51,16 +53,20 @@
     "@tanstack/react-router-devtools": "latest",
     "@tanstack/router-cli": "^1.132.0",
     "@tanstack/router-plugin": "latest",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^22.10.2",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
     "drizzle-kit": "^0.31.10",
     "eslint-plugin-perfectionist": "^5.11.0",
+    "jsdom": "^26.1.0",
     "oxfmt": "^0.67.0",
     "oxlint": "^1.82.0",
     "typescript": "^6.0.2",
     "vite": "^8.1.4",
+    "vitest": "^4.1.12",
     "wrangler": "^4.110.0"
   }
 }

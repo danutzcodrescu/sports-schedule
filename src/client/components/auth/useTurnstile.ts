@@ -3,11 +3,13 @@ import { useRef } from "react";
 
 import type { TurnstileFieldHandle } from "#/components/auth/TurnstileField.tsx";
 
+export type CaptchaFetchOptions = { headers: { "x-captcha-response": string } };
+
 export function useTurnstile() {
   const fieldRef = useRef<TurnstileFieldHandle>(null);
 
   async function withTurnstile<Result>(
-    request: (fetchOptions: { headers: { "x-captcha-response": string } }) => Promise<Result>,
+    request: (fetchOptions: CaptchaFetchOptions) => Promise<Result>,
   ) {
     const response = fieldRef.current?.getResponse();
     if (!response) {

@@ -1,4 +1,4 @@
-import { getEventScore, getLeagueTeams, refreshLeagueEvents } from "./sportsdb.ts";
+import { getEventScore, getLeagueEvents, getLeagueTeams, refreshLeagueEvents } from "./sportsdb.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -69,6 +69,64 @@ test("league event refresh preserves cached data when the upstream request fails
     /TheSportsDB request failed with status 503/,
   );
   assert.equal(entries.get("sportsdb:events:4335:v1"), staleValue);
+});
+
+test("event reads reuse cached data and share refresh retrieval and expiration on a miss", async (context) => {
+  const events = { events: [{ idEvent: "new" }] };
+  const entries = new Map<string, string>();
+  const writes: Array<{ key: string; expirationTtl?: number }> = [];
+  const cache = {
+    get: async (key: string) => (entries.has(key) ? JSON.parse(entries.get(key)!) : null),
+    put: async (key: string, value: string, options?: { expirationTtl?: number }) => {
+      entries.set(key, value);
+      writes.push({ key, expirationTtl: options?.expirationTtl });
+    },
+  } as unknown as KVNamespace;
+  const fetchMock = context.mock.method(globalThis, "fetch", async (input: URL) => {
+    assert.equal(input.pathname, "/api/v1/json/test-key/eventsnextleague.php");
+    assert.equal(input.search, "?id=4335");
+    return Response.json(events);
+  });
+
+  assert.deepEqual(await getLeagueEvents(cache, "test-key", "4335"), {
+    data: events,
+    status: "MISS",
+  });
+  assert.deepEqual(await getLeagueEvents(cache, "test-key", "4335"), {
+    data: events,
+    status: "HIT",
+  });
+  assert.equal(fetchMock.mock.callCount(), 1);
+  assert.deepEqual(writes, [{ key: "sportsdb:events:4335:v1", expirationTtl: 60 * 60 * 24 * 3 }]);
+
+  const refreshed = { events: [{ idEvent: "refreshed" }] };
+  fetchMock.mock.mockImplementation(async () => Response.json(refreshed));
+  await refreshLeagueEvents(cache, "test-key", "4335");
+  assert.deepEqual(await getLeagueEvents(cache, "test-key", "4335"), {
+    data: refreshed,
+    status: "HIT",
+  });
+  assert.equal(fetchMock.mock.callCount(), 2);
+});
+
+test("event cache misses do not write failed or malformed upstream responses", async (context) => {
+  const writes: string[] = [];
+  const cache = {
+    get: async () => null,
+    put: async (key: string) => {
+      writes.push(key);
+    },
+  } as unknown as KVNamespace;
+  const fetchMock = context.mock.method(
+    globalThis,
+    "fetch",
+    async () => new Response(null, { status: 503 }),
+  );
+
+  await assert.rejects(getLeagueEvents(cache, "test-key", "4335"), /status 503/);
+  fetchMock.mock.mockImplementation(async () => new Response("invalid JSON"));
+  await assert.rejects(getLeagueEvents(cache, "test-key", "4335"), SyntaxError);
+  assert.deepEqual(writes, []);
 });
 
 test("event scores look up only the requested ID without caching or returning event metadata", async (context) => {

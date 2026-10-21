@@ -2,14 +2,13 @@ import { requireAuth } from "../auth/middleware";
 import { rateLimitSports } from "../rate-limit";
 import {
   createSportsDbUrl,
+  getLeagueEvents,
   getLeagueTeams,
   getEventScore,
-  leagueEventsCacheKey,
 } from "../services/sportsdb";
 import { Hono } from "hono";
 
 import type { AppEnv } from "../auth/middleware";
-import type { EventsResponse } from "../services/sportsdb";
 
 type SportsResponse = {
   sports: Array<{
@@ -38,7 +37,6 @@ type CacheResult<T> = {
 
 const SPORTS_CACHE_KEY = "sportsdb:sports:v1";
 const MONTH_IN_SECONDS = 60 * 60 * 24 * 30;
-const THREE_DAYS_IN_SECONDS = 60 * 60 * 24 * 3;
 
 async function getCachedJson<T>(
   cache: KVNamespace,
@@ -71,12 +69,6 @@ async function getCachedJson<T>(
     console.error("TheSportsDB request threw an error", { endpoint, error });
     return null;
   }
-}
-
-function leagueUrl(apiKey: string, endpoint: string, leagueId: string) {
-  const url = createSportsDbUrl(apiKey, endpoint);
-  url.searchParams.set("id", leagueId);
-  return url;
 }
 
 export const sportsRoutes = new Hono<AppEnv>()
@@ -170,17 +162,12 @@ export const sportsRoutes = new Hono<AppEnv>()
       return c.json({ error: "Invalid league ID" }, 400);
     }
 
-    const result = await getCachedJson<EventsResponse>(
-      c.env.SPORTS_CACHE,
-      leagueEventsCacheKey(leagueId),
-      leagueUrl(c.env.SPORTSDB_API_KEY, "eventsnextleague.php", leagueId),
-      THREE_DAYS_IN_SECONDS,
-    );
-
-    if (!result) {
+    try {
+      const result = await getLeagueEvents(c.env.SPORTS_CACHE, c.env.SPORTSDB_API_KEY, leagueId);
+      c.header("X-Cache", result.status);
+      return c.json(result.data);
+    } catch (error) {
+      console.error("Failed to fetch league events", { leagueId, error });
       return c.json({ error: "TheSportsDB request failed" }, 502);
     }
-
-    c.header("X-Cache", result.status);
-    return c.json(result.data);
   });

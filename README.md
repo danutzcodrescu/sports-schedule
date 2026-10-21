@@ -60,6 +60,8 @@ Open the URL printed by Vite, then visit `/signup` to create an account. If Vite
 
 Local D1 and KV state is stored under `.wrangler/`. Signup is disabled unless the `signup-enabled` value in `FEATURE_FLAGS` is exactly `true`; when disabled, `/signup` redirects to `/signin` and the signup API returns `403`.
 
+Client-side signup navigation checks `/api/signup-status` without caching. Disabled signup, a failed lookup, or an invalid status response redirects to `/signin`; the server independently checks the flag before accepting registration.
+
 ## Environment variables
 
 | Variable                  | Purpose                                                | Local configuration                              | Production configuration                                      |
@@ -141,7 +143,8 @@ To disable signup again, write `false` to the same key. Local and remote flags a
 | `pnpm build`                        | Build the client and Worker                                          |
 | `pnpm preview`                      | Preview the production build locally                                 |
 | `pnpm run deploy`                   | Build and deploy with `.env.production` secrets                      |
-| `pnpm test`                         | Run event utility and TheSportsDB service tests                      |
+| `pnpm test`                         | Run data, schedule interaction, authentication, and Worker tests     |
+| `pnpm test:node` / `pnpm test:app`  | Run native Node tests or Vitest interaction/integration tests        |
 | `pnpm lint` / `pnpm lint:fix`       | Check or fix lint issues with Oxlint                                 |
 | `pnpm format:check` / `pnpm format` | Check or apply formatting with Oxfmt                                 |
 | `pnpm cf-typegen`                   | Regenerate `CloudflareBindings` after Wrangler configuration changes |

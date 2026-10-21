@@ -1,16 +1,7 @@
 import { Badge } from "#/components/ui/Badge";
 import { Button } from "#/components/ui/Button";
 import { SelectionButton } from "#/components/ui/SelectionButton";
-import { eventScoreQuery } from "#/lib/api/sports-queries";
-import {
-  filterEvents,
-  filterEventsByTeams,
-  formatDayHeading,
-  getEventStatus,
-  groupEventsByLocalDay,
-  localDayKey,
-  shouldFallBackToAllTeams,
-} from "./event-utils";
+import { formatDayHeading, localDayKey } from "./event-utils";
 import { EventCard } from "./EventCard";
 import {
   Calendar03Icon,
@@ -20,11 +11,9 @@ import {
   SparklesIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { focusManager, useQueries } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
 
-import type { FavouriteTeam, SportsEvent } from "#/lib/api/sports";
-import type { ScheduleFilter, TeamFilter } from "./event-utils";
+import type { ScheduleFilter } from "./event-utils";
+import type { useEventSchedule } from "./useEventSchedule";
 
 const scheduleFilters = [
   { id: "upcoming", label: "Upcoming", icon: SparklesIcon },
@@ -33,15 +22,8 @@ const scheduleFilters = [
   { id: "tomorrow", label: "Tomorrow", icon: Clock01Icon },
 ] as const;
 
-const LIVE_SCORE_POLL_INTERVAL = 60 * 1000;
-
 type EventScheduleProps = {
-  events: SportsEvent[];
-  favouriteTeams: FavouriteTeam[];
-  selectedTeam: FavouriteTeam | null;
-  onClearTeam: () => void;
-  teamFilter: TeamFilter;
-  onTeamFilterChange: (filter: TeamFilter) => void;
+  schedule: ReturnType<typeof useEventSchedule>;
   isLoading: boolean;
   hasError: boolean;
   hasLeagues: boolean;
@@ -49,60 +31,24 @@ type EventScheduleProps = {
 };
 
 export function EventSchedule({
-  events,
-  favouriteTeams,
-  selectedTeam,
-  onClearTeam,
-  teamFilter,
-  onTeamFilterChange,
+  schedule,
   isLoading,
   hasError,
   hasLeagues,
   onAddLeague,
 }: EventScheduleProps) {
-  const [activeFilter, setActiveFilter] = useState<ScheduleFilter>("upcoming");
-  const { now, isWindowFocused } = useFocusedClock();
-
-  const favouriteTeamIds = new Set(favouriteTeams.map((team) => team.teamId));
-  const selectedTeamIds = new Set(selectedTeam ? [selectedTeam.teamId] : favouriteTeamIds);
-  const teamEvents = filterEventsByTeams(
-    events,
-    selectedTeam ? "favourites" : teamFilter,
-    selectedTeamIds,
-  );
-  const isFilteringTeams =
-    Boolean(selectedTeam) || (teamFilter === "favourites" && favouriteTeams.length > 0);
-  const changeTeamFilter = (filter: TeamFilter) => {
-    onTeamFilterChange(filter);
-    onClearTeam();
-  };
-  const changeScheduleFilter = (filter: ScheduleFilter) => {
-    setActiveFilter(filter);
-    if (
-      !isLoading &&
-      !hasError &&
-      !selectedTeam &&
-      teamFilter === "favourites" &&
-      shouldFallBackToAllTeams(events, filter, favouriteTeamIds, now)
-    ) {
-      changeTeamFilter("all");
-    }
-  };
-  const visibleEvents = filterEvents(teamEvents, activeFilter, now);
-  const liveScores = useQueries({
-    queries: (isLoading ? [] : visibleEvents)
-      .filter((event) => getEventStatus(event, now) === "live")
-      .map((event) => ({
-        ...eventScoreQuery(event.idEvent),
-        enabled: isWindowFocused,
-        refetchInterval: LIVE_SCORE_POLL_INTERVAL,
-      })),
-  });
-  const eventGroups = groupEventsByLocalDay(visibleEvents);
-  const liveCount = teamEvents.filter((event) => getEventStatus(event, now) === "live").length;
-  const liveScoresByEvent = new Map(
-    liveScores.flatMap(({ data }) => (data ? [[data.idEvent, data] as const] : [])),
-  );
+  const {
+    activeFilter,
+    selectedTeam,
+    teamFilter,
+    isFilteringTeams,
+    visibleEvents,
+    eventGroups,
+    liveCount,
+    liveScoresByEvent,
+    now,
+    changeSelection,
+  } = schedule;
 
   return (
     <section className="page-padding">
@@ -112,7 +58,7 @@ export function EventSchedule({
             <SelectionButton
               key={filter.id}
               aria-pressed={activeFilter === filter.id}
-              onClick={() => changeScheduleFilter(filter.id)}
+              onClick={() => changeSelection({ type: "period", filter: filter.id })}
             >
               <HugeiconsIcon icon={filter.icon} className="size-4" />
               {filter.label}
@@ -127,14 +73,14 @@ export function EventSchedule({
         >
           <SelectionButton
             aria-pressed={!selectedTeam && teamFilter === "favourites"}
-            onClick={() => changeTeamFilter("favourites")}
+            onClick={() => changeSelection({ type: "teams", filter: "favourites" })}
           >
             <HugeiconsIcon icon={FavouriteIcon} className="size-4" />
             Favourites
           </SelectionButton>
           <SelectionButton
             aria-pressed={!selectedTeam && teamFilter === "all"}
-            onClick={() => changeTeamFilter("all")}
+            onClick={() => changeSelection({ type: "teams", filter: "all" })}
           >
             All
           </SelectionButton>
@@ -196,38 +142,12 @@ export function EventSchedule({
             onAddLeague={onAddLeague}
             isFilteringTeams={isFilteringTeams}
             selectedTeamName={selectedTeam?.teamName}
-            onShowAll={() => changeTeamFilter("all")}
+            onShowAll={() => changeSelection({ type: "teams", filter: "all" })}
           />
         )}
       </div>
     </section>
   );
-}
-
-function useFocusedClock() {
-  const [clock, setClock] = useState(() => ({
-    now: new Date(),
-    isWindowFocused: focusManager.isFocused(),
-  }));
-
-  useEffect(() => {
-    const unsubscribe = focusManager.subscribe((isWindowFocused) => {
-      setClock((current) => ({
-        now: isWindowFocused ? new Date() : current.now,
-        isWindowFocused,
-      }));
-    });
-    const interval = window.setInterval(() => {
-      if (focusManager.isFocused()) setClock({ now: new Date(), isWindowFocused: true });
-    }, LIVE_SCORE_POLL_INTERVAL);
-
-    return () => {
-      window.clearInterval(interval);
-      unsubscribe();
-    };
-  }, []);
-
-  return clock;
 }
 
 function EventLoadingState() {

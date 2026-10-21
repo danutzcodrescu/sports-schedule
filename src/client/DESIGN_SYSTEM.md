@@ -63,6 +63,9 @@ with text or semantics as well as color.
   previous Favourites/All filter. Choosing Favourites or All clears the individual
   team selection. Team rows use the shared navigation selection style, with a
   separate remove button.
+- Choosing Today, Tomorrow, or Live falls back from Favourites to All when no
+  favourite events match, unless an individual team is selected or event data is
+  unavailable. Upcoming deliberately keeps the Favourites selection.
 - The header's league/team search opens a command picker with `Mod+K` (⌘K on
   macOS, Ctrl+K on Windows/Linux). It searches followed leagues and favourite
   teams, preserving the sidebar's independent league/team filtering behavior.

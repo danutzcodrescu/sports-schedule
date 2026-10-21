@@ -75,10 +75,15 @@ export function DashboardHeader({
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label="Followed leagues"
-              render={<Button variant="outline" className="w-full min-w-0 justify-between" />}
+              render={
+                <Button
+                  variant="outline"
+                  className="h-auto min-h-control w-full min-w-0 justify-between py-2 whitespace-normal"
+                />
+              }
             >
               <LeagueIcon league={activeLeague} />
-              <span className="min-w-0 flex-1 truncate text-left">
+              <span className="min-w-0 flex-1 text-left wrap-anywhere">
                 {activeLeague?.leagueName || "All followed"}
               </span>
               <HugeiconsIcon icon={ArrowDown01Icon} className="size-4" />

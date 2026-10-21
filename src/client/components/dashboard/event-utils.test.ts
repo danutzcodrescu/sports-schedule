@@ -5,48 +5,12 @@ import {
   leagueHasFavouriteTeam,
   shouldFallBackToAllTeams,
 } from "./event-utils.ts";
+import { makeEvent as event, makeFavouriteTeam as favouriteTeam } from "./test-fixtures.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { SportsEvent } from "#/lib/api/sports";
-import type { FavouriteTeam } from "#/lib/api/sports";
-
 const now = new Date(2026, 8, 16, 12);
 const liveStart = new Date(2026, 8, 16, 11, 30).toISOString();
-
-function event(id: string, overrides: Partial<SportsEvent> = {}): SportsEvent {
-  return {
-    idEvent: id,
-    strEvent: "Home vs Away",
-    strSport: "Soccer",
-    idLeague: "1",
-    strLeague: "League",
-    strSeason: null,
-    dateEvent: "2026-09-16",
-    strTime: null,
-    strTimestamp: new Date(2026, 8, 16, 13).toISOString(),
-    idHomeTeam: "10",
-    strHomeTeam: "Home",
-    strHomeTeamBadge: null,
-    idAwayTeam: "20",
-    strAwayTeam: "Away",
-    strAwayTeamBadge: null,
-    strThumb: null,
-    strVenue: null,
-    intRound: null,
-    ...overrides,
-  };
-}
-
-function favouriteTeam(teamId: string, leagueId: string): FavouriteTeam {
-  return {
-    teamId,
-    leagueId,
-    teamName: "Favourite",
-    country: null,
-    badgeUrl: null,
-  };
-}
 
 test("favourites match home and away IDs across followed competitions, without duplicates", () => {
   const events = [

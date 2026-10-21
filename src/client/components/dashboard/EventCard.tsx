@@ -3,12 +3,13 @@ import { getEventStart, getEventStatus } from "./event-utils";
 import { TrophyIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
-import type { LiveScore, SportsEvent } from "#/lib/api/sports";
+import type { SportsEvent } from "#/lib/api/sports";
+import type { EventScore } from "./useEventSchedule";
 
 type EventCardProps = {
   event: SportsEvent;
   now: Date;
-  liveScore?: LiveScore;
+  liveScore?: EventScore;
 };
 
 export function EventCard({ event, now, liveScore }: EventCardProps) {
@@ -20,7 +21,7 @@ export function EventCard({ event, now, liveScore }: EventCardProps) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(start);
-  const liveStatus = currentLiveScore?.strStatus || "live";
+  const liveStatus = currentLiveScore?.status || "live";
 
   return (
     <article
@@ -58,12 +59,12 @@ export function EventCard({ event, now, liveScore }: EventCardProps) {
               <TeamRow
                 name={event.strHomeTeam}
                 badge={event.strHomeTeamBadge}
-                score={currentLiveScore?.intHomeScore}
+                score={currentLiveScore?.home}
               />
               <TeamRow
                 name={event.strAwayTeam}
                 badge={event.strAwayTeamBadge}
-                score={currentLiveScore?.intAwayScore}
+                score={currentLiveScore?.away}
               />
             </div>
           ) : (
@@ -97,7 +98,7 @@ function TeamRow({
 }: {
   name: string | null;
   badge: string | null;
-  score?: string | null;
+  score?: string;
 }) {
   if (!name) return null;
 
@@ -112,9 +113,7 @@ function TeamRow({
       </span>
       <span className="min-w-0 flex-1 text-base font-semibold wrap-anywhere">{name}</span>
       {score !== undefined ? (
-        <span className="shrink-0 text-xl font-semibold text-live tabular-nums">
-          {score ?? "0"}
-        </span>
+        <span className="shrink-0 text-xl font-semibold text-live tabular-nums">{score}</span>
       ) : null}
     </div>
   );

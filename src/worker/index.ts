@@ -25,6 +25,10 @@ const app = new Hono<AppEnv>()
     return c.env.ASSETS.fetch(c.req.raw);
   })
   .use("/api/*", rateLimitApi)
+  .get("/api/signup-status", async (c) => {
+    c.header("Cache-Control", "no-store");
+    return c.json({ enabled: await isSignupEnabled(c.env) });
+  })
   .use("/api/auth/*", rateLimitAuth)
   .post("/api/auth/sign-up/email", async (c) => {
     if (!(await isSignupEnabled(c.env))) {

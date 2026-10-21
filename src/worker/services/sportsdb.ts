@@ -21,7 +21,7 @@ const SPORTS_DB_BASE_URL = "https://www.thesportsdb.com/api/v1/json";
 const MONTH_IN_SECONDS = 60 * 60 * 24 * 30;
 const THREE_DAYS_IN_SECONDS = 60 * 60 * 24 * 3;
 
-export type EventsResponse = {
+type EventsResponse = {
   events: Array<{
     idEvent: string;
     strEvent: string;
@@ -105,8 +105,15 @@ export async function getEventScore(apiKey: string, eventId: string) {
   };
 }
 
-export function leagueEventsCacheKey(leagueId: string) {
+function leagueEventsCacheKey(leagueId: string) {
   return `sportsdb:events:${leagueId}:v1`;
+}
+
+export async function getLeagueEvents(cache: KVNamespace, apiKey: string, leagueId: string) {
+  const cached = await cache.get<EventsResponse>(leagueEventsCacheKey(leagueId), "json");
+  if (cached) return { data: cached, status: "HIT" };
+
+  return { data: await refreshLeagueEvents(cache, apiKey, leagueId), status: "MISS" };
 }
 
 export async function refreshLeagueEvents(cache: KVNamespace, apiKey: string, leagueId: string) {

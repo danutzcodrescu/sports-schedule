@@ -3,16 +3,16 @@ import { leagueEventsQuery } from "#/lib/api/sports-queries";
 import { AddLeagueDialog } from "./AddLeagueDialog";
 import { AddTeamDialog } from "./AddTeamDialog";
 import { DashboardHeader } from "./DashboardHeader";
-import { leagueHasFavouriteTeam, sortAndDeduplicateEvents } from "./event-utils";
+import { sortAndDeduplicateEvents } from "./event-utils";
 import { EventSchedule } from "./EventSchedule";
 import { FilterCommandDialog } from "./FilterCommandDialog";
 import { LeagueSidebar } from "./LeagueSidebar";
+import { useEventSchedule } from "./useEventSchedule";
 import { useHotkey } from "@tanstack/react-hotkeys";
 import { useMutation, useQueries } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type { FavouriteTeam, FollowedLeague } from "#/lib/api/sports";
-import type { TeamFilter } from "./event-utils";
 
 type SportsDashboardProps = {
   userName: string;
@@ -34,9 +34,6 @@ export function SportsDashboard({
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [isTeamDialogOpen, setTeamDialogOpen] = useState(false);
   const [isFilterDialogOpen, setFilterDialogOpen] = useState(false);
-  const [activeLeagueId, setActiveLeagueId] = useState<string | null>(null);
-  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
-  const [teamFilter, setTeamFilter] = useState<TeamFilter>("favourites");
   useHotkey("Mod+K", () => setFilterDialogOpen((open) => !open), {
     enabled: !isDialogOpen && !isTeamDialogOpen,
     requireReset: true,
@@ -51,22 +48,21 @@ export function SportsDashboard({
   });
 
   const allEvents = sortAndDeduplicateEvents(eventQueries.flatMap((query) => query.data ?? []));
-  const selectedTeam = favouriteTeams.find((team) => team.teamId === activeTeamId) ?? null;
-  const selectedLeagueId = leagues.some((league) => league.leagueId === activeLeagueId)
-    ? activeLeagueId
-    : null;
-  const changeLeague = (leagueId: string | null) => {
-    setActiveLeagueId(leagueId);
-    if (leagueId && !leagueHasFavouriteTeam(leagueId, favouriteTeams, allEvents)) {
-      setTeamFilter("all");
-      setActiveTeamId(null);
-    }
-  };
+  const isLoading = eventQueries.some((query) => query.isPending);
+  const hasError = eventQueries.length > 0 && eventQueries.every((query) => query.isError);
+  const schedule = useEventSchedule({
+    leagues,
+    favouriteTeams,
+    events: allEvents,
+    isLoading,
+    hasError,
+  });
+  const { selectedTeam, selectedLeagueId, changeSelection } = schedule;
+  const changeLeague = (leagueId: string | null) => changeSelection({ type: "league", leagueId });
   const teamProps = {
     teams: favouriteTeams,
     activeTeamId: selectedTeam?.teamId ?? null,
-    onTeamChange: (teamId: string) =>
-      setActiveTeamId(selectedTeam?.teamId === teamId ? null : teamId),
+    onTeamChange: (teamId: string) => changeSelection({ type: "team", teamId }),
     onAddTeam: () => {
       removeTeamMutation.reset();
       setTeamDialogOpen(true);
@@ -75,11 +71,6 @@ export function SportsDashboard({
     isSavingTeams: removeTeamMutation.isPending,
     hasTeamsError: removeTeamMutation.isError,
   };
-  const events = selectedLeagueId
-    ? allEvents.filter((event) => event.idLeague === selectedLeagueId)
-    : allEvents;
-  const isLoading = eventQueries.some((query) => query.isPending);
-  const hasError = eventQueries.length > 0 && eventQueries.every((query) => query.isError);
 
   return (
     <div className="safe-area min-h-dvh bg-background text-foreground">
@@ -105,12 +96,7 @@ export function SportsDashboard({
             onSignOut={onSignOut}
           />
           <EventSchedule
-            events={events}
-            favouriteTeams={favouriteTeams}
-            selectedTeam={selectedTeam}
-            onClearTeam={() => setActiveTeamId(null)}
-            teamFilter={teamFilter}
-            onTeamFilterChange={setTeamFilter}
+            schedule={schedule}
             isLoading={isLoading}
             hasError={hasError}
             hasLeagues={Boolean(leagues.length)}
@@ -128,7 +114,7 @@ export function SportsDashboard({
         activeTeamId={selectedTeam?.teamId ?? null}
         onLeagueChange={changeLeague}
         onTeamChange={teamProps.onTeamChange}
-        onClearTeam={() => setActiveTeamId(null)}
+        onClearTeam={() => changeSelection({ type: "clear-team" })}
       />
 
       {isDialogOpen ? (
