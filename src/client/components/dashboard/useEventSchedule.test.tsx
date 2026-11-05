@@ -241,14 +241,14 @@ test("event cards suppress scores outside the playing window and keep absent liv
   expect(screen.queryByText("0")).toBeNull();
 });
 
-test("dashboard controls share selection rules and long team/league labels retain wrapping", () => {
+test("dashboard controls share selection rules, sidebar labels truncate, and picker labels wrap", () => {
   const league = {
     ...makeLeague("1"),
-    leagueName: "A very long followed league name that must wrap",
+    leagueName: "A very long followed league name",
   };
   const team = {
     ...makeFavouriteTeam("10", "1"),
-    teamName: "A very long favourite team name that must wrap",
+    teamName: "A very long favourite team name",
   };
   const client = new QueryClient();
   clients.push(client);
@@ -280,17 +280,20 @@ test("dashboard controls share selection rules and long team/league labels retai
   expect(all.getAttribute("aria-pressed")).toBe("true");
   expect(screen.getByRole("status").textContent).toContain("2 scheduled events");
 
-  fireEvent.click(sidebar.getByRole("button", { name: league.leagueName }));
+  const leagueButton = sidebar.getByRole("button", { name: league.leagueName });
+  fireEvent.click(leagueButton);
   const picker = screen.getByRole("button", { name: "Followed leagues" });
   expect(picker.classList.contains("whitespace-normal")).toBe(true);
   expect(picker.classList.contains("h-auto")).toBe(true);
   expect(within(picker).getByText(league.leagueName).classList.contains("wrap-anywhere")).toBe(
     true,
   );
-  expect(within(teamButton).getByText(team.teamName).classList.contains("wrap-anywhere")).toBe(
+  expect(within(teamButton).getByText(team.teamName).classList.contains("truncate")).toBe(true);
+  expect(teamButton.getAttribute("title")).toBe(team.teamName);
+  expect(within(leagueButton).getByText(league.leagueName).classList.contains("truncate")).toBe(
     true,
   );
-  expect(sidebar.getByText(league.leagueName).classList.contains("wrap-anywhere")).toBe(true);
+  expect(leagueButton.getAttribute("title")).toBe(league.leagueName);
 
   fireEvent.click(screen.getByRole("button", { name: "Favourites" }));
   fireEvent.click(teamButton);
