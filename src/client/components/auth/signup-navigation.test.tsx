@@ -43,6 +43,18 @@ async function openSignin() {
   return router;
 }
 
+async function navigateTo(
+  router: Awaited<ReturnType<typeof openSignin>>,
+  to: "/signin" | "/signup",
+) {
+  let navigation!: ReturnType<typeof router.navigate>;
+  // Flush renders before awaiting navigation, which resolves after the router commits.
+  await act(() => {
+    navigation = router.navigate({ to });
+  });
+  await navigation;
+}
+
 test("client navigation cannot display signup when the runtime flag is disabled", async () => {
   vi.stubGlobal(
     "fetch",
@@ -50,9 +62,7 @@ test("client navigation cannot display signup when the runtime flag is disabled"
   );
   const router = await openSignin();
 
-  await act(async () => {
-    await router.navigate({ to: "/signup" });
-  });
+  await navigateTo(router, "/signup");
 
   expect(router.state.location.pathname).toBe("/signin");
   expect(screen.queryByRole("heading", { name: "Create an account" })).toBeNull();
@@ -64,18 +74,12 @@ test("signup navigation rechecks the runtime flag rather than reusing an enabled
   vi.stubGlobal("fetch", fetch);
   const router = await openSignin();
 
-  await act(async () => {
-    await router.navigate({ to: "/signup" });
-  });
+  await navigateTo(router, "/signup");
   expect(screen.getByRole("heading", { name: "Create an account" })).toBeTruthy();
 
-  await act(async () => {
-    await router.navigate({ to: "/signin" });
-  });
+  await navigateTo(router, "/signin");
   enabled = false;
-  await act(async () => {
-    await router.navigate({ to: "/signup" });
-  });
+  await navigateTo(router, "/signup");
 
   expect(router.state.location.pathname).toBe("/signin");
   expect(fetch).toHaveBeenCalledTimes(2);
@@ -92,9 +96,7 @@ test("signup stays hidden if the runtime flag cannot be checked", async () => {
   );
   const router = await openSignin();
 
-  await act(async () => {
-    await router.navigate({ to: "/signup" });
-  });
+  await navigateTo(router, "/signup");
 
   expect(router.state.location.pathname).toBe("/signin");
 });
@@ -107,9 +109,7 @@ test.each([null, {}, { enabled: "true" }])(
       vi.fn(async () => Response.json(status)),
     );
     const router = await openSignin();
-    await act(async () => {
-      await router.navigate({ to: "/signup" });
-    });
+    await navigateTo(router, "/signup");
     expect(router.state.location.pathname).toBe("/signin");
   },
 );
@@ -122,8 +122,6 @@ test("signup stays hidden after a network failure", async () => {
     }),
   );
   const router = await openSignin();
-  await act(async () => {
-    await router.navigate({ to: "/signup" });
-  });
+  await navigateTo(router, "/signup");
   expect(router.state.location.pathname).toBe("/signin");
 });

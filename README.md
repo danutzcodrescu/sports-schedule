@@ -12,9 +12,11 @@ A personal sports dashboard for following leagues, saving favourite teams, and b
 
 ## Stack
 
-- **Client:** React 19, TypeScript, Vite, TanStack Router and Query, Tailwind CSS 4, and Base UI.
+- **Client:** React 19 APIs with the TanStack Redact runtime, TypeScript, Vite, TanStack Router and Query, Tailwind CSS 4, and Base UI.
 - **Server:** Hono running on Cloudflare Workers, with the client served as static assets.
 - **Storage:** Cloudflare D1 (SQLite) through Drizzle ORM, plus Workers KV for sports caching and feature flags.
+
+The [Redact Vite plugin](https://tanstack.com/redact/latest/docs/vite-plugin) replaces the React runtime in the app and Vitest; application imports stay on `react` and `react-dom`.
 
 ## Local development
 
