@@ -4,6 +4,8 @@ import { rateLimitApi, rateLimitAuth } from "./rate-limit";
 import { favouriteTeamsRoutes } from "./routes/favourite-teams";
 import { followedLeaguesRoutes } from "./routes/followed-leagues";
 import { sportsRoutes } from "./routes/sports";
+import { workerSentryOptions } from "./sentry";
+import { sentry, withSentry } from "@sentry/hono/cloudflare";
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 
@@ -15,7 +17,9 @@ function isSignupEnabled(env: CloudflareBindings) {
   return env.FEATURE_FLAGS.get(SIGNUP_FEATURE_FLAG).then((value) => value === "true");
 }
 
-const app = new Hono<AppEnv>()
+const app = new Hono<AppEnv>();
+const routes = app
+  .use(sentry(app, workerSentryOptions))
   .use(logger())
   .on(["GET", "HEAD"], "/signup", async (c) => {
     if (!(await isSignupEnabled(c.env))) {
@@ -53,10 +57,14 @@ app.onError((error, c) => {
   return c.json({ error: "Internal server error" }, 500);
 });
 
-export default {
-  fetch: app.fetch,
+const scheduledHandler = withSentry(workerSentryOptions, {
   async scheduled(_controller, env, _ctx) {
     await refreshEventCaches(env);
   },
+} satisfies ExportedHandler<CloudflareBindings>);
+
+export default {
+  fetch: routes.fetch,
+  scheduled: scheduledHandler.scheduled,
 } satisfies ExportedHandler<CloudflareBindings>;
-export type AppType = typeof app;
+export type AppType = typeof routes;

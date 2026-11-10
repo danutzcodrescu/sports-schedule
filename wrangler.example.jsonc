@@ -3,6 +3,7 @@
   // Copy this file to wrangler.jsonc. Replace resource IDs before deploying.
   "name": "sports-schedule",
   "compatibility_date": "2026-09-10",
+  "compatibility_flags": ["nodejs_compat"],
   "main": "./src/worker/index.ts",
   "triggers": {
     // Refresh event caches daily at midnight UTC.

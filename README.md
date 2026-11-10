@@ -9,6 +9,7 @@ A personal sports dashboard for following leagues, saving favourite teams, and b
 - Email/password authentication with Better Auth and Cloudflare Turnstile.
 - Cached sports data, a daily event-cache refresh, and API rate limiting.
 - Signup controlled through a KV feature flag.
+- Optional Sentry error reporting for the browser, API, and scheduled cache refresh.
 
 ## Stack
 
@@ -73,8 +74,31 @@ Client-side signup navigation checks `/api/signup-status` without caching. Disab
 | `SPORTSDB_API_KEY`        | Server-side TheSportsDB API key                        | `.dev.vars`                                      | `.env.production`                                             |
 | `TURNSTILE_SECRET_KEY`    | Server-side CAPTCHA verification                       | `.dev.vars` with the test key above              | `.env.production` with a real widget secret                   |
 | `VITE_TURNSTILE_SITE_KEY` | Public CAPTCHA widget site key, embedded at build time | Optional in `.env.local`; defaults to a test key | Build environment or `.env.production.local`                  |
+| `VITE_SENTRY_DSN`        | Public browser Sentry DSN, embedded at build time      | Omit; browser monitoring is disabled in dev     | Build environment or `.env.production.local`                  |
+| `SENTRY_DSN`             | Worker Sentry DSN                                      | Omit to disable monitoring                     | `.env.production`                                             |
+| `SENTRY_ENVIRONMENT`     | Worker Sentry environment (defaults to `production`)   | Optional in `.dev.vars`                        | Optional in `.env.production`                                  |
 
-`.dev.vars`, `.env.local`, `.env.production`, and `*.local` files are gitignored. Only the public Turnstile site key should use the `VITE_` prefix, because Vite exposes those variables to the browser.
+`.dev.vars`, `.env.local`, `.env.production`, and `*.local` files are gitignored. Only public values such as the Turnstile site key and browser Sentry DSN should use the `VITE_` prefix, because Vite exposes those variables to the browser.
+
+## Sentry
+
+The configured project is [danut-empire/sports-schedule](https://danut-empire.sentry.io/issues/?project=4512407868014592), owned by the existing `-` team. Its browser DSN and source-map project settings are in the gitignored `.env.production.local`; the Worker DSN is in `.env.production`.
+
+Set `VITE_SENTRY_DSN` for browser errors and `SENTRY_DSN` for Worker errors. You can use the same Sentry project for both, or separate projects. Browser monitoring runs only in production builds; Worker monitoring is disabled when its DSN is absent. React root errors, TanStack Router errors, Hono request errors, and failed scheduled jobs are reported without changing error responses or job failures.
+
+Tracing, replay, logs, and metrics are not enabled. Automatic collection of user identity, cookies, HTTP headers/bodies, URL query parameters, and database query data (Worker) is disabled. Error messages and stack traces are still sent, so avoid including secrets in thrown errors.
+
+For readable production stack traces, set these **build-only** variables in CI or `.env.production.local`:
+
+```dotenv
+SENTRY_AUTH_TOKEN=your-source-map-upload-token
+SENTRY_ORG=your-organization-slug
+SENTRY_PROJECT=your-project-slug
+```
+
+When all three are set, `pnpm build` generates hidden source maps and uploads each client and Worker build to that project. Client maps are deleted after upload so they are not deployed as public assets. Without upload credentials, builds still work and client source maps are not emitted. If using separate browser and Worker projects, upload the Worker maps separately to its project.
+
+Never prefix `SENTRY_AUTH_TOKEN` with `VITE_` or put it in `.env.production`, which the deployment command uploads as Worker secrets. The Worker SDK requires `nodejs_compat`; keep that flag in your `wrangler.jsonc` as shown in the example.
 
 ## Deploy to Cloudflare
 

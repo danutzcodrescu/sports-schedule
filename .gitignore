@@ -17,6 +17,7 @@ wrangler.jsonc
 .env
 .env.production
 .dev.vars
+.env.sentry-build-plugin
 
 # logs
 logs/
