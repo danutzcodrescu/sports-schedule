@@ -62,7 +62,15 @@ with text or semantics as well as color.
   within the current league and period filters; clicking it again restores the
   previous Favourites/All filter. Choosing Favourites or All clears the individual
   team selection. Team rows use the shared navigation selection style, with a
-  separate remove button.
+  separate remove button. League rows also have a separate remove button. These
+  small × controls appear on desktop row hover or keyboard focus and stay visible
+  on mobile and coarse-pointer devices; mobile league removal lives inside the menu.
+  Removing a league checks team catalogues, retains teams in other followed leagues,
+  and asks for confirmation listing any favourite teams that would also be removed.
+  Secondary competition IDs count as membership evidence; an unavailable catalogue
+  does not prove a team's absence. Unverifiable removals fail without changing preferences.
+  The league picker commits additions and removals atomically, after any confirmation,
+  so cancelling even a refreshed confirmation leaves saved preferences unchanged.
 - Choosing Today, Tomorrow, or Live falls back from Favourites to All when no
   favourite events match, unless an individual team is selected or event data is
   unavailable. Upcoming deliberately keeps the Favourites selection.

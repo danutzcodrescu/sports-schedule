@@ -157,6 +157,17 @@
   .league-sidebar {
     container: sidebar / size;
   }
+  @media (width >= theme(--breakpoint-lg)) and (hover: hover) and (pointer: fine) {
+    .removable-row .row-remove {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .removable-row:hover .row-remove,
+    .removable-row:focus-within .row-remove {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
   @container sidebar (height < 48rem) {
     .sidebar-brand {
       @apply px-4 py-3;

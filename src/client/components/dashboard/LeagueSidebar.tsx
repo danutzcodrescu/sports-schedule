@@ -3,6 +3,7 @@ import { Brand } from "#/components/ui/Brand";
 import { Button } from "#/components/ui/Button";
 import { SelectionButton } from "#/components/ui/SelectionButton";
 import { MyTeams } from "./MyTeams";
+import { RowRemoveButton } from "./RowRemoveButton";
 import { Logout01Icon, PlusSignIcon, SparklesIcon, TrophyIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
@@ -15,6 +16,9 @@ type LeagueSidebarProps = MyTeamsProps & {
   activeLeagueId: string | null;
   onLeagueChange: (leagueId: string | null) => void;
   onAddLeague: () => void;
+  onRemoveLeague: (leagueId: string) => void;
+  isRemovingLeague: boolean;
+  leagueRemovalError: string | null;
   onSignOut: () => Promise<void>;
 };
 
@@ -24,6 +28,9 @@ export function LeagueSidebar({
   activeLeagueId,
   onLeagueChange,
   onAddLeague,
+  onRemoveLeague,
+  isRemovingLeague,
+  leagueRemovalError,
   onSignOut,
   ...teamProps
 }: LeagueSidebarProps) {
@@ -39,12 +46,23 @@ export function LeagueSidebar({
             <h2 className="eyebrow">My leagues</h2>
             <Badge>{leagues.length}</Badge>
           </div>
-          <Button variant="ghost" size="icon-sm" onClick={onAddLeague} aria-label="Add a league">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onAddLeague}
+            disabled={isRemovingLeague}
+            aria-label="Add a league"
+          >
             <HugeiconsIcon icon={PlusSignIcon} className="size-4" />
           </Button>
         </div>
 
         <nav className="p-1" aria-label="Followed leagues">
+          {leagueRemovalError ? (
+            <p className="alert-error mb-2" role="alert">
+              {leagueRemovalError}
+            </p>
+          ) : null}
           {leagues.length ? (
             <SelectionButton
               variant="navigation"
@@ -58,22 +76,32 @@ export function LeagueSidebar({
             </SelectionButton>
           ) : null}
           {leagues.map((league) => (
-            <SelectionButton
-              variant="navigation"
+            <div
               key={league.leagueId}
-              aria-pressed={activeLeagueId === league.leagueId}
-              onClick={() => onLeagueChange(league.leagueId)}
-              title={league.leagueName}
+              className="removable-row flex min-w-0 items-center gap-2 rounded-lg pr-2"
             >
-              <span className="icon-surface size-6 overflow-hidden">
-                {league.badgeUrl ? (
-                  <img src={league.badgeUrl} alt="" className="size-5 object-contain" />
-                ) : (
-                  <HugeiconsIcon icon={TrophyIcon} className="size-3.5" />
-                )}
-              </span>
-              <span className="truncate font-medium">{league.leagueName}</span>
-            </SelectionButton>
+              <SelectionButton
+                variant="navigation"
+                className="min-w-0 flex-1"
+                aria-pressed={activeLeagueId === league.leagueId}
+                onClick={() => onLeagueChange(league.leagueId)}
+                title={league.leagueName}
+              >
+                <span className="icon-surface size-6 overflow-hidden">
+                  {league.badgeUrl ? (
+                    <img src={league.badgeUrl} alt="" className="size-5 object-contain" />
+                  ) : (
+                    <HugeiconsIcon icon={TrophyIcon} className="size-3.5" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-medium">{league.leagueName}</span>
+              </SelectionButton>
+              <RowRemoveButton
+                onClick={() => onRemoveLeague(league.leagueId)}
+                disabled={isRemovingLeague || teamProps.isSavingTeams}
+                aria-label={`Remove ${league.leagueName} from followed leagues`}
+              />
+            </div>
           ))}
           {!leagues.length ? (
             <SelectionButton

@@ -1,12 +1,8 @@
 import { Badge } from "#/components/ui/Badge";
 import { Button } from "#/components/ui/Button";
 import { SelectionButton } from "#/components/ui/SelectionButton";
-import {
-  Cancel01Icon,
-  FavouriteIcon,
-  PlusSignIcon,
-  UserGroupIcon,
-} from "@hugeicons/core-free-icons";
+import { RowRemoveButton } from "./RowRemoveButton";
+import { FavouriteIcon, PlusSignIcon, UserGroupIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
 import type { FavouriteTeam } from "#/lib/api/sports";
@@ -56,7 +52,10 @@ export function MyTeams({
       {teams.length ? (
         <ul className="p-1">
           {teams.map((team) => (
-            <li key={team.teamId} className="flex min-w-0 items-center gap-2 rounded-lg pr-2">
+            <li
+              key={team.teamId}
+              className="removable-row flex min-w-0 items-center gap-2 rounded-lg pr-2"
+            >
               <SelectionButton
                 variant="navigation"
                 className="flex-1"
@@ -73,15 +72,11 @@ export function MyTeams({
                 </span>
                 <span className="min-w-0 flex-1 truncate font-medium">{team.teamName}</span>
               </SelectionButton>
-              <Button
-                variant="ghost"
-                size="icon-xs"
+              <RowRemoveButton
                 onClick={() => onRemoveTeam(team.teamId)}
                 disabled={isSavingTeams}
                 aria-label={`Remove ${team.teamName} from favourites`}
-              >
-                <HugeiconsIcon icon={Cancel01Icon} className="size-3.5" />
-              </Button>
+              />
             </li>
           ))}
         </ul>

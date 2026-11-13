@@ -2,12 +2,14 @@ import { Button } from "#/components/ui/Button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "#/components/ui/DropdownMenu";
 import { MyTeams } from "./MyTeams";
+import { RowRemoveButton } from "./RowRemoveButton";
 import {
   ArrowDown01Icon,
   Logout01Icon,
@@ -27,6 +29,9 @@ type DashboardHeaderProps = MyTeamsProps & {
   activeLeagueId: string | null;
   onLeagueChange: (leagueId: string | null) => void;
   onAddLeague: () => void;
+  onRemoveLeague: (leagueId: string) => void;
+  isRemovingLeague: boolean;
+  leagueRemovalError: string | null;
   onSignOut: () => Promise<void>;
   onSearch: () => void;
 };
@@ -36,6 +41,9 @@ export function DashboardHeader({
   activeLeagueId,
   onLeagueChange,
   onAddLeague,
+  onRemoveLeague,
+  isRemovingLeague,
+  leagueRemovalError,
   onSignOut,
   onSearch,
   ...teamProps
@@ -61,7 +69,13 @@ export function DashboardHeader({
           </kbd>
         </Button>
         <div className="flex shrink-0 items-center gap-2 lg:hidden">
-          <Button variant="outline" size="icon" onClick={onAddLeague} aria-label="Add a league">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onAddLeague}
+            disabled={isRemovingLeague}
+            aria-label="Add a league"
+          >
             <HugeiconsIcon icon={PlusSignIcon} />
           </Button>
           <Button variant="ghost" size="icon" onClick={onSignOut} aria-label="Sign out">
@@ -99,15 +113,37 @@ export function DashboardHeader({
                 </DropdownMenuRadioItem>
                 <DropdownMenuSeparator />
                 {leagues.map((league) => (
-                  <DropdownMenuRadioItem key={league.leagueId} value={league.leagueId} closeOnClick>
-                    <LeagueIcon league={league} />
-                    <span className="min-w-0 wrap-anywhere">{league.leagueName}</span>
-                  </DropdownMenuRadioItem>
+                  <div key={league.leagueId} className="flex min-w-0 items-center gap-2 pr-2">
+                    <DropdownMenuRadioItem
+                      className="min-w-0 flex-1"
+                      value={league.leagueId}
+                      closeOnClick
+                    >
+                      <LeagueIcon league={league} />
+                      <span className="min-w-0 wrap-anywhere">{league.leagueName}</span>
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuItem
+                      render={
+                        <RowRemoveButton
+                          className="opacity-100"
+                          aria-label={`Remove ${league.leagueName} from followed leagues`}
+                        />
+                      }
+                      disabled={isRemovingLeague || teamProps.isSavingTeams}
+                      onClick={() => onRemoveLeague(league.leagueId)}
+                      closeOnClick
+                    />
+                  </div>
                 ))}
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+      ) : null}
+      {leagueRemovalError ? (
+        <p className="alert-error mt-3 lg:hidden" role="alert">
+          {leagueRemovalError}
+        </p>
       ) : null}
       <details className="mt-3 rounded-lg border lg:hidden">
         <summary className="touch-target cursor-pointer px-3 py-3 text-sm font-medium">

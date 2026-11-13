@@ -6,8 +6,10 @@ import { DashboardHeader } from "./DashboardHeader";
 import { sortAndDeduplicateEvents } from "./event-utils";
 import { EventSchedule } from "./EventSchedule";
 import { FilterCommandDialog } from "./FilterCommandDialog";
+import { LeagueRemovalConfirmation } from "./LeagueRemovalConfirmation";
 import { LeagueSidebar } from "./LeagueSidebar";
 import { useEventSchedule } from "./useEventSchedule";
+import { useLeagueRemoval } from "./useLeagueRemoval";
 import { useHotkey } from "@tanstack/react-hotkeys";
 import { useMutation, useQueries } from "@tanstack/react-query";
 import { useState } from "react";
@@ -34,8 +36,13 @@ export function SportsDashboard({
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [isTeamDialogOpen, setTeamDialogOpen] = useState(false);
   const [isFilterDialogOpen, setFilterDialogOpen] = useState(false);
+  const refreshPreferences = async () => {
+    await Promise.all([onLeaguesChanged(), onTeamsChanged()]);
+  };
+  const leagueRemoval = useLeagueRemoval(refreshPreferences);
+  const isRemovingLeague = leagueRemoval.isPending || leagueRemoval.confirmation !== null;
   useHotkey("Mod+K", () => setFilterDialogOpen((open) => !open), {
-    enabled: !isDialogOpen && !isTeamDialogOpen,
+    enabled: !isDialogOpen && !isTeamDialogOpen && !isRemovingLeague,
     requireReset: true,
   });
   const removeTeamMutation = useMutation({
@@ -68,8 +75,13 @@ export function SportsDashboard({
       setTeamDialogOpen(true);
     },
     onRemoveTeam: (teamId: string) => removeTeamMutation.mutate(teamId),
-    isSavingTeams: removeTeamMutation.isPending,
+    isSavingTeams: removeTeamMutation.isPending || isRemovingLeague,
     hasTeamsError: removeTeamMutation.isError,
+  };
+  const leagueRemovalProps = {
+    onRemoveLeague: (leagueId: string) => leagueRemoval.start({ leagueIds: [leagueId] }),
+    isRemovingLeague,
+    leagueRemovalError: leagueRemoval.error,
   };
 
   return (
@@ -77,6 +89,7 @@ export function SportsDashboard({
       <div className="mx-auto flex min-h-dvh max-w-app">
         <LeagueSidebar
           {...teamProps}
+          {...leagueRemovalProps}
           userName={userName}
           leagues={leagues}
           activeLeagueId={selectedLeagueId}
@@ -88,6 +101,7 @@ export function SportsDashboard({
         <main className="@container/dashboard min-w-0 flex-1">
           <DashboardHeader
             {...teamProps}
+            {...leagueRemovalProps}
             onSearch={() => setFilterDialogOpen(true)}
             leagues={leagues}
             activeLeagueId={selectedLeagueId}
@@ -121,9 +135,10 @@ export function SportsDashboard({
         <AddLeagueDialog
           followedLeagues={leagues}
           onOpenChange={setDialogOpen}
-          onSaved={onLeaguesChanged}
+          onSaved={refreshPreferences}
         />
       ) : null}
+      <LeagueRemovalConfirmation removal={leagueRemoval} />
       {isTeamDialogOpen ? (
         <AddTeamDialog
           followedLeagues={leagues}

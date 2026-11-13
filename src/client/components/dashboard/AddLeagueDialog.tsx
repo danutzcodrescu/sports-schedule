@@ -10,7 +10,9 @@ import {
 } from "#/components/ui/Dialog";
 import { Input } from "#/components/ui/Input";
 import { SelectionButton } from "#/components/ui/SelectionButton";
-import { followLeague, getLeagues, getSports, unfollowLeague } from "#/lib/api/sports";
+import { getLeagues, getSports } from "#/lib/api/sports";
+import { LeagueRemovalConfirmation } from "./LeagueRemovalConfirmation";
+import { useLeagueRemoval } from "./useLeagueRemoval";
 import {
   ArrowLeft01Icon,
   CheckmarkCircle02Icon,
@@ -20,7 +22,7 @@ import {
   TrophyIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useDeferredValue, useReducer } from "react";
 
 import type { FollowedLeague, League, Sport } from "#/lib/api/sports";
@@ -105,35 +107,23 @@ export function AddLeagueDialog({ followedLeagues, onOpenChange, onSaved }: AddL
     enabled: state.step === "leagues",
     staleTime: 10 * 60 * 1000,
   });
-  const saveMutation = useMutation({
-    mutationFn: async ({
-      additions,
-      removals,
-    }: {
-      additions: League[];
-      removals: FollowedLeague[];
-    }) =>
-      Promise.all([
-        ...additions.map((league) => followLeague(league.idLeague)),
-        ...removals.map((league) => unfollowLeague(league.leagueId)),
-      ]),
-    onSuccess: async () => {
-      await onSaved();
-      onOpenChange(false);
-    },
+  const removal = useLeagueRemoval(async () => {
+    await onSaved();
+    onOpenChange(false);
   });
+  const isSaving = removal.isPending;
   const deferredSearch = useDeferredValue(state.search.trim().toLowerCase());
   const sports = sportsQuery.data ?? [];
   const leagues = leaguesQuery.data ?? [];
   const isLoading = state.step === "sports" ? sportsQuery.isPending : leaguesQuery.isPending;
   const loadError = state.step === "sports" ? sportsQuery.isError : leaguesQuery.isError;
-  const error = saveMutation.isError
-    ? "Your leagues could not be saved. Please try again."
-    : loadError
+  const error =
+    removal.error ??
+    (loadError
       ? state.step === "sports"
         ? "Sports could not be loaded. Please try again."
         : "Leagues could not be loaded. Please try again."
-      : null;
+      : null);
 
   const filteredSports = sports.filter((sport) =>
     sport.strSport.toLowerCase().includes(deferredSearch),
@@ -162,154 +152,176 @@ export function AddLeagueDialog({ followedLeagues, onOpenChange, onSaved }: AddL
       (league) => !state.selectedLeagues.has(league.leagueId),
     );
 
-    saveMutation.mutate({ additions, removals });
+    removal.start({
+      leagueIds: removals.map((league) => league.leagueId),
+      additionalLeagueIds: additions.map((league) => league.idLeague),
+    });
   }
 
   function goBack() {
-    saveMutation.reset();
+    removal.cancel();
     dispatch({ type: "wentBack" });
   }
 
   return (
-    <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent size="wide" mobileFullscreen className="dialog-layout overflow-hidden">
-        <DialogHeader className="dialog-header-padding border-b">
-          <div className="flex flex-wrap items-center gap-3">
-            {state.step === "leagues" ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="-ml-2"
-                onClick={goBack}
-                aria-label="Choose another sport"
-              >
-                <HugeiconsIcon icon={ArrowLeft01Icon} />
-              </Button>
-            ) : null}
-            <DialogTitle>Add a league</DialogTitle>
-            <Badge>Step {state.step === "sports" ? 1 : 2} of 2</Badge>
-          </div>
-          <DialogDescription>
-            {state.step === "sports"
-              ? "Pick a sport to browse its leagues"
-              : `Pick leagues to follow — ${state.selectedSport.strSport}`}
-          </DialogDescription>
-          <div className="mt-4 h-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-            <div
-              className={`h-full rounded-full bg-primary transition-all ${state.step === "sports" ? "w-1/2" : "w-full"}`}
-            />
-          </div>
-        </DialogHeader>
-
-        <div className="dialog-body-padding min-h-0 overflow-y-auto overscroll-contain">
-          <div className="relative mb-4">
-            <HugeiconsIcon
-              icon={Search01Icon}
-              className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              value={state.search}
-              onChange={(event) => dispatch({ type: "searchChanged", search: event.target.value })}
-              size="lg"
-              className="pl-12"
-              placeholder={
-                state.step === "sports"
-                  ? "Search sports..."
-                  : `Search ${state.selectedSport.strSport} leagues...`
-              }
-              aria-label={state.step === "sports" ? "Search sports" : "Search leagues"}
-            />
-          </div>
-
-          {error ? (
-            <div className="alert-error mb-4" role="alert">
-              {error}
-            </div>
-          ) : null}
-
-          {isLoading ? (
-            <div className="empty-state text-sm text-muted-foreground" role="status">
-              Loading…
-            </div>
-          ) : state.step === "sports" ? (
-            <div className="grid gap-4 @xl/dialog:grid-cols-2 @4xl/dialog:grid-cols-3">
-              {filteredSports.map((sport) => (
-                <SelectionButton
-                  variant="card"
-                  key={sport.idSport}
-                  onClick={() => selectSport(sport)}
-                  className="min-h-24"
+    <>
+      <Dialog
+        open
+        onOpenChange={(open) => {
+          if (!isSaving) onOpenChange(open);
+        }}
+      >
+        <DialogContent
+          size="wide"
+          mobileFullscreen
+          showCloseButton={!isSaving}
+          className="dialog-layout overflow-hidden"
+        >
+          <DialogHeader className="dialog-header-padding border-b">
+            <div className="flex flex-wrap items-center gap-3">
+              {state.step === "leagues" ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-ml-2"
+                  onClick={goBack}
+                  disabled={isSaving}
+                  aria-label="Choose another sport"
                 >
-                  <span className="icon-surface size-10">
-                    <HugeiconsIcon icon={TrophyIcon} className="size-5" />
-                  </span>
-                  <span className="min-w-0 font-semibold wrap-anywhere">{sport.strSport}</span>
-                </SelectionButton>
-              ))}
-              {!filteredSports.length ? (
-                <div className="empty-state col-span-full text-sm text-muted-foreground">
-                  No matching sports found.
-                </div>
+                  <HugeiconsIcon icon={ArrowLeft01Icon} />
+                </Button>
               ) : null}
+              <DialogTitle>Add a league</DialogTitle>
+              <Badge>Step {state.step === "sports" ? 1 : 2} of 2</Badge>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {filteredLeagues.map((league) => {
-                const selected = state.selectedLeagues.has(league.idLeague);
+            <DialogDescription>
+              {state.step === "sports"
+                ? "Pick a sport to browse its leagues"
+                : `Pick leagues to follow — ${state.selectedSport.strSport}`}
+            </DialogDescription>
+            <div className="mt-4 h-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+              <div
+                className={`h-full rounded-full bg-primary transition-all ${state.step === "sports" ? "w-1/2" : "w-full"}`}
+              />
+            </div>
+          </DialogHeader>
 
-                return (
+          <div className="dialog-body-padding min-h-0 overflow-y-auto overscroll-contain">
+            <div className="relative mb-4">
+              <HugeiconsIcon
+                icon={Search01Icon}
+                className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                value={state.search}
+                onChange={(event) =>
+                  dispatch({ type: "searchChanged", search: event.target.value })
+                }
+                size="lg"
+                className="pl-12"
+                placeholder={
+                  state.step === "sports"
+                    ? "Search sports..."
+                    : `Search ${state.selectedSport.strSport} leagues...`
+                }
+                aria-label={state.step === "sports" ? "Search sports" : "Search leagues"}
+              />
+            </div>
+
+            {error ? (
+              <div className="alert-error mb-4" role="alert">
+                {error}
+              </div>
+            ) : null}
+
+            {isLoading ? (
+              <div className="empty-state text-sm text-muted-foreground" role="status">
+                Loading…
+              </div>
+            ) : state.step === "sports" ? (
+              <div className="grid gap-4 @xl/dialog:grid-cols-2 @4xl/dialog:grid-cols-3">
+                {filteredSports.map((sport) => (
                   <SelectionButton
                     variant="card"
-                    key={league.idLeague}
-                    onClick={() => toggleLeague(league)}
-                    aria-pressed={selected}
+                    key={sport.idSport}
+                    onClick={() => selectSport(sport)}
+                    className="min-h-24"
                   >
-                    <span className="icon-surface size-12 overflow-hidden">
-                      {league.strBadge ? (
-                        <img src={league.strBadge} alt="" className="size-10 object-contain" />
-                      ) : (
-                        <HugeiconsIcon icon={TrophyIcon} className="size-5" />
-                      )}
+                    <span className="icon-surface size-10">
+                      <HugeiconsIcon icon={TrophyIcon} className="size-5" />
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-semibold wrap-anywhere">{league.strLeague}</span>
-                      <span className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <HugeiconsIcon icon={Globe02Icon} className="size-4 shrink-0" />
-                        <span className="min-w-0 wrap-anywhere">
-                          {league.strCountry || "Worldwide"}
+                    <span className="min-w-0 font-semibold wrap-anywhere">{sport.strSport}</span>
+                  </SelectionButton>
+                ))}
+                {!filteredSports.length ? (
+                  <div className="empty-state col-span-full text-sm text-muted-foreground">
+                    No matching sports found.
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredLeagues.map((league) => {
+                  const selected = state.selectedLeagues.has(league.idLeague);
+
+                  return (
+                    <SelectionButton
+                      variant="card"
+                      key={league.idLeague}
+                      onClick={() => toggleLeague(league)}
+                      aria-pressed={selected}
+                      disabled={isSaving}
+                    >
+                      <span className="icon-surface size-12 overflow-hidden">
+                        {league.strBadge ? (
+                          <img src={league.strBadge} alt="" className="size-10 object-contain" />
+                        ) : (
+                          <HugeiconsIcon icon={TrophyIcon} className="size-5" />
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold wrap-anywhere">
+                          {league.strLeague}
+                        </span>
+                        <span className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <HugeiconsIcon icon={Globe02Icon} className="size-4 shrink-0" />
+                          <span className="min-w-0 wrap-anywhere">
+                            {league.strCountry || "Worldwide"}
+                          </span>
                         </span>
                       </span>
-                    </span>
-                    <HugeiconsIcon
-                      icon={selected ? CheckmarkCircle02Icon : PlusSignIcon}
-                      className={
-                        selected
-                          ? "size-5 shrink-0 text-primary"
-                          : "size-5 shrink-0 text-muted-foreground"
-                      }
-                    />
-                  </SelectionButton>
-                );
-              })}
-              {!filteredLeagues.length ? (
-                <div className="empty-state text-sm text-muted-foreground">
-                  No matching leagues found.
-                </div>
-              ) : null}
-            </div>
-          )}
-        </div>
+                      <HugeiconsIcon
+                        icon={selected ? CheckmarkCircle02Icon : PlusSignIcon}
+                        className={
+                          selected
+                            ? "size-5 shrink-0 text-primary"
+                            : "size-5 shrink-0 text-muted-foreground"
+                        }
+                      />
+                    </SelectionButton>
+                  );
+                })}
+                {!filteredLeagues.length ? (
+                  <div className="empty-state text-sm text-muted-foreground">
+                    No matching leagues found.
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
 
-        <DialogFooter className="dialog-footer-padding border-t">
-          {state.step === "leagues" ? (
-            <Button onClick={saveLeagues} disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? "Saving…" : `Done · ${newSelectionCount} selected`}
-            </Button>
-          ) : (
-            <span className="text-sm text-muted-foreground">Choose a sport to continue</span>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter className="dialog-footer-padding border-t">
+            {state.step === "leagues" ? (
+              <Button onClick={saveLeagues} disabled={isSaving}>
+                {isSaving ? "Saving…" : `Done · ${newSelectionCount} selected`}
+              </Button>
+            ) : (
+              <span className="text-sm text-muted-foreground">Choose a sport to continue</span>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <LeagueRemovalConfirmation removal={removal} />
+    </>
   );
 }

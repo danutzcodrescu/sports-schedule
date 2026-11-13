@@ -63,12 +63,59 @@ export type TeamDetails = {
   strLeague: string;
   strCountry: string | null;
   strBadge: string | null;
-};
+} & Partial<Record<`idLeague${2 | 3 | 4 | 5 | 6 | 7}`, string | null>>;
+
+const SECONDARY_LEAGUE_FIELDS = [
+  "idLeague2",
+  "idLeague3",
+  "idLeague4",
+  "idLeague5",
+  "idLeague6",
+  "idLeague7",
+] as const;
+
+export function getTeamLeagueIds(team: TeamDetails) {
+  return [team.idLeague, ...SECONDARY_LEAGUE_FIELDS.map((field) => team[field])].filter(
+    (id): id is string => typeof id === "string" && /^\d+$/.test(id),
+  );
+}
+
+function isTeamDetails(value: unknown): value is TeamDetails {
+  if (!value || typeof value !== "object") return false;
+  const team = value as Record<string, unknown>;
+  return (
+    ["idTeam", "idLeague", "strTeam", "strSport", "strLeague"].every(
+      (key) => typeof team[key] === "string" && team[key].length > 0,
+    ) &&
+    /^\d+$/.test(String(team.idTeam)) &&
+    /^\d+$/.test(String(team.idLeague)) &&
+    ["strCountry", "strBadge"].every(
+      (key) => team[key] === null || typeof team[key] === "string",
+    ) &&
+    SECONDARY_LEAGUE_FIELDS.every(
+      (key) =>
+        team[key] === undefined ||
+        team[key] === null ||
+        team[key] === "" ||
+        (typeof team[key] === "string" && /^\d+$/.test(team[key])),
+    )
+  );
+}
+
+function parseTeamCatalogue(value: unknown) {
+  if (!value || typeof value !== "object" || !("teams" in value))
+    throw new Error("Invalid TheSportsDB team catalogue");
+  if ("error" in value && value.error) throw new Error("Invalid TheSportsDB team catalogue");
+  if (value.teams === null) return { teams: [] as TeamDetails[], hasCatalogue: false };
+  if (!Array.isArray(value.teams) || !value.teams.every(isTeamDetails))
+    throw new Error("Invalid TheSportsDB team catalogue");
+  return { teams: value.teams, hasCatalogue: true };
+}
 
 export async function getLeagueTeams(cache: KVNamespace, apiKey: string, leagueId: string) {
   const cacheKey = `sportsdb:teams:${leagueId}:v2`;
-  const cached = await cache.get<{ teams: TeamDetails[] | null }>(cacheKey, "json");
-  if (cached) return { teams: cached.teams ?? [], status: "HIT" };
+  const cached = await cache.get<unknown>(cacheKey, "json");
+  if (cached !== null) return { ...parseTeamCatalogue(cached), status: "HIT" };
 
   // The list endpoint accepts league IDs via `id`; `l` is for league names.
   const url = createSportsDbUrl(apiKey, "search_all_teams.php");
@@ -78,9 +125,10 @@ export async function getLeagueTeams(cache: KVNamespace, apiKey: string, leagueI
     throw new Error(`TheSportsDB request failed with status ${response.status}`);
   }
 
-  const body = (await response.json()) as { teams: TeamDetails[] | null };
+  const body: unknown = await response.json();
+  const catalogue = parseTeamCatalogue(body);
   await cache.put(cacheKey, JSON.stringify(body), { expirationTtl: MONTH_IN_SECONDS });
-  return { teams: body.teams ?? [], status: "MISS" };
+  return { ...catalogue, status: "MISS" };
 }
 
 export function createSportsDbUrl(apiKey: string, endpoint: string) {

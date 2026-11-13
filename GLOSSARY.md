@@ -8,7 +8,7 @@ A personal schedule of events from followed leagues, narrowed by favourite teams
 A league a person has saved to their schedule.
 
 **Favourite team**:
-A team a person has saved independently of their followed leagues.
+A team a person has saved to their schedule, which may belong to several followed leagues.
 _Avoid_: Selected team, which refers to an active filter rather than a saved preference.
 
 **Schedule selection**:

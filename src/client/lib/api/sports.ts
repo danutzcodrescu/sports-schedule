@@ -85,11 +85,30 @@ export function saveFavouriteTeams(teams: FavouriteTeam[]) {
   });
 }
 
+export class SportsApiError extends Error {
+  constructor(
+    status: number,
+    public code?: string,
+  ) {
+    super(`Request failed with status ${status}`);
+    this.name = "SportsApiError";
+  }
+}
+
+async function createApiError(response: Response) {
+  const body: unknown = await response.json().catch(() => null);
+  const code =
+    body && typeof body === "object" && "code" in body && typeof body.code === "string"
+      ? body.code
+      : undefined;
+  return new SportsApiError(response.status, code);
+}
+
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { credentials: "same-origin", ...init });
 
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
+    throw await createApiError(response);
   }
 
   return response.json() as Promise<T>;
@@ -135,13 +154,37 @@ export function followLeague(leagueId: string) {
   });
 }
 
-export async function unfollowLeague(leagueId: string) {
-  const response = await fetch(`/api/followed-leagues/${encodeURIComponent(leagueId)}`, {
+export function previewLeagueRemoval(leagueIds: string[], additionalLeagueIds: string[] = []) {
+  return getJson<{ teams: FavouriteTeam[] }>("/api/followed-leagues/removal-preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ leagueIds, additionalLeagueIds }),
+  });
+}
+
+export class LeagueRemovalConflict extends Error {
+  constructor(public teams: FavouriteTeam[]) {
+    super("The affected teams changed. Please review the list again.");
+  }
+}
+
+export async function removeFollowedLeagues(
+  leagueIds: string[],
+  confirmedTeamIds: string[],
+  additionalLeagueIds: string[] = [],
+) {
+  const response = await fetch("/api/followed-leagues", {
     method: "DELETE",
     credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ leagueIds, confirmedTeamIds, additionalLeagueIds }),
   });
 
+  if (response.status === 409) {
+    const body = (await response.json()) as { teams: FavouriteTeam[] };
+    throw new LeagueRemovalConflict(body.teams);
+  }
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
+    throw await createApiError(response);
   }
 }

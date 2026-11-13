@@ -15,7 +15,17 @@ function mockRetryTimers(context: TestContext, random = 0.5) {
 }
 
 test("league team lookup uses the supported list API with the league ID and caches its result", async (context) => {
-  const teams = [{ idTeam: "133738", strTeam: "Barcelona", idLeague: "4335" }];
+  const teams = [
+    {
+      idTeam: "133738",
+      strTeam: "Barcelona",
+      idLeague: "4335",
+      strSport: "Soccer",
+      strLeague: "La Liga",
+      strCountry: "Spain",
+      strBadge: null,
+    },
+  ];
   const entries = new Map<string, string>([
     ["sportsdb:teams:4335:v1", JSON.stringify({ teams: [{ idTeam: "obsolete" }] })],
   ]);
@@ -32,9 +42,70 @@ test("league team lookup uses the supported list API with the league ID and cach
     return Response.json({ teams });
   });
 
-  assert.deepEqual(await getLeagueTeams(cache, "test-key", "4335"), { teams, status: "MISS" });
-  assert.deepEqual(await getLeagueTeams(cache, "test-key", "4335"), { teams, status: "HIT" });
+  assert.deepEqual(await getLeagueTeams(cache, "test-key", "4335"), {
+    teams,
+    hasCatalogue: true,
+    status: "MISS",
+  });
+  assert.deepEqual(await getLeagueTeams(cache, "test-key", "4335"), {
+    teams,
+    hasCatalogue: true,
+    status: "HIT",
+  });
   assert.equal(fetchMock.mock.callCount(), 1);
+});
+
+for (const [label, body] of [
+  ["error", { error: "Catalogue unavailable" }],
+  ["error with empty list", { teams: [], error: "Catalogue unavailable" }],
+  ["invalid list", { teams: {} }],
+  ["invalid team", { teams: [{ idTeam: "133738" }] }],
+] as const) {
+  for (const source of ["cached", "upstream"]) {
+    test(`league team lookup rejects ${source} ${label} without caching it`, async (context) => {
+      const writes: string[] = [];
+      const cache = {
+        get: async () => (source === "cached" ? body : null),
+        put: async (_key: string, value: string) => {
+          writes.push(value);
+        },
+      } as unknown as KVNamespace;
+      const fetchMock = context.mock.method(globalThis, "fetch", async () => Response.json(body));
+      await assert.rejects(
+        getLeagueTeams(cache, "test-key", "4335"),
+        /Invalid TheSportsDB team catalogue/,
+      );
+      assert.deepEqual(writes, []);
+      assert.equal(fetchMock.mock.callCount(), source === "cached" ? 0 : 1);
+    });
+  }
+}
+
+test("league team lookup distinguishes an unavailable catalogue from a valid empty catalogue", async (context) => {
+  const entries = new Map<string, unknown>();
+  const cache = {
+    get: async (key: string) => entries.get(key) ?? null,
+    put: async (key: string, value: string) => {
+      entries.set(key, JSON.parse(value));
+    },
+  } as unknown as KVNamespace;
+  context.mock.method(globalThis, "fetch", async () => Response.json({ teams: null }));
+  assert.deepEqual(await getLeagueTeams(cache, "test-key", "4480"), {
+    teams: [],
+    hasCatalogue: false,
+    status: "MISS",
+  });
+  assert.deepEqual(await getLeagueTeams(cache, "test-key", "4480"), {
+    teams: [],
+    hasCatalogue: false,
+    status: "HIT",
+  });
+  entries.set("sportsdb:teams:4480:v2", { teams: [] });
+  assert.deepEqual(await getLeagueTeams(cache, "test-key", "4480"), {
+    teams: [],
+    hasCatalogue: true,
+    status: "HIT",
+  });
 });
 
 test("league event refresh bypasses stale cache data and replaces it", async (context) => {

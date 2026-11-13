@@ -47,6 +47,10 @@ function DropdownMenuRadioGroup(props: MenuPrimitive.RadioGroup.Props) {
   return <MenuPrimitive.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />;
 }
 
+function DropdownMenuItem(props: MenuPrimitive.Item.Props) {
+  return <MenuPrimitive.Item data-slot="dropdown-menu-item" {...props} />;
+}
+
 function DropdownMenuRadioItem({ className, children, ...props }: MenuPrimitive.RadioItem.Props) {
   return (
     <MenuPrimitive.RadioItem
@@ -80,6 +84,7 @@ function DropdownMenuSeparator({ className, ...props }: MenuPrimitive.Separator.
 export {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
