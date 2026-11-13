@@ -74,9 +74,9 @@ Client-side signup navigation checks `/api/signup-status` without caching. Disab
 | `SPORTSDB_API_KEY`        | Server-side TheSportsDB API key                        | `.dev.vars`                                      | `.env.production`                                             |
 | `TURNSTILE_SECRET_KEY`    | Server-side CAPTCHA verification                       | `.dev.vars` with the test key above              | `.env.production` with a real widget secret                   |
 | `VITE_TURNSTILE_SITE_KEY` | Public CAPTCHA widget site key, embedded at build time | Optional in `.env.local`; defaults to a test key | Build environment or `.env.production.local`                  |
-| `VITE_SENTRY_DSN`        | Public browser Sentry DSN, embedded at build time      | Omit; browser monitoring is disabled in dev     | Build environment or `.env.production.local`                  |
-| `SENTRY_DSN`             | Worker Sentry DSN                                      | Omit to disable monitoring                     | `.env.production`                                             |
-| `SENTRY_ENVIRONMENT`     | Worker Sentry environment (defaults to `production`)   | Optional in `.dev.vars`                        | Optional in `.env.production`                                  |
+| `VITE_SENTRY_DSN`         | Public browser Sentry DSN, embedded at build time      | Omit; browser monitoring is disabled in dev      | Build environment or `.env.production.local`                  |
+| `SENTRY_DSN`              | Worker Sentry DSN                                      | Omit to disable monitoring                       | `.env.production`                                             |
+| `SENTRY_ENVIRONMENT`      | Worker Sentry environment (defaults to `production`)   | Optional in `.dev.vars`                          | Optional in `.env.production`                                 |
 
 `.dev.vars`, `.env.local`, `.env.production`, and `*.local` files are gitignored. Only public values such as the Turnstile site key and browser Sentry DSN should use the `VITE_` prefix, because Vite exposes those variables to the browser.
 
@@ -124,6 +124,8 @@ Update `wrangler.jsonc` with the returned database and namespace IDs. If you cho
 | `*_RATE_LIMITER` | Six rate-limit bindings for API, authentication, sports, and mutation requests |
 
 Choose an available Worker `name` and distinct rate-limit `namespace_id` values within your account. The template runs the event-cache refresh every day at **00:00 UTC** for leagues referenced by followed leagues or favourite teams.
+
+Event retrieval retries HTTP 429, 502, 503, and 504 responses up to three times after the initial request, with exponential backoff and jitter (0.5–1, 1–2, then 2–4 seconds). `Retry-After` is respected up to 30 seconds; longer waits fail without retrying early. Failed refreshes preserve existing cache entries until their original expiry. The daily job continues with other leagues and reports any remaining failures to Sentry; persistent failures are retried on the next scheduled run.
 
 ### 2. Configure production authentication
 

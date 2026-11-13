@@ -20,6 +20,9 @@ type LeagueLookupResponse = {
 const SPORTS_DB_BASE_URL = "https://www.thesportsdb.com/api/v1/json";
 const MONTH_IN_SECONDS = 60 * 60 * 24 * 30;
 const THREE_DAYS_IN_SECONDS = 60 * 60 * 24 * 3;
+const EVENT_REQUEST_MAX_RETRIES = 3;
+const EVENT_REQUEST_RETRY_STATUSES = new Set([429, 502, 503, 504]);
+const EVENT_REQUEST_MAX_RETRY_DELAY_MS = 30_000;
 
 type EventsResponse = {
   events: Array<{
@@ -116,14 +119,46 @@ export async function getLeagueEvents(cache: KVNamespace, apiKey: string, league
   return { data: await refreshLeagueEvents(cache, apiKey, leagueId), status: "MISS" };
 }
 
+function eventRequestRetryDelay(response: Response, retry: number) {
+  const backoff = 1_000 * 2 ** retry * (0.5 + Math.random() * 0.5);
+  const retryAfter = response.headers.get("Retry-After");
+  if (!retryAfter) return backoff;
+
+  const seconds = Number(retryAfter);
+  const serverDelay = Number.isFinite(seconds)
+    ? Math.max(0, seconds * 1_000)
+    : Math.max(0, Date.parse(retryAfter) - Date.now());
+
+  // Do not retry earlier than requested, or keep a request waiting indefinitely.
+  if (serverDelay > EVENT_REQUEST_MAX_RETRY_DELAY_MS) return null;
+  return Number.isFinite(serverDelay) ? Math.max(backoff, serverDelay) : backoff;
+}
+
+async function fetchLeagueEventsResponse(url: URL) {
+  for (let retry = 0; ; retry += 1) {
+    const response = await fetch(url);
+    if (response.ok) return response;
+
+    const delay =
+      retry < EVENT_REQUEST_MAX_RETRIES && EVENT_REQUEST_RETRY_STATUSES.has(response.status)
+        ? eventRequestRetryDelay(response, retry)
+        : null;
+
+    // Release every failed response, including exhausted retries, so later leagues can connect.
+    await response.body?.cancel();
+    if (delay === null) {
+      throw new Error(`TheSportsDB request failed with status ${response.status}`);
+    }
+
+    await new Promise<void>((resolve) => setTimeout(resolve, delay));
+  }
+}
+
 export async function refreshLeagueEvents(cache: KVNamespace, apiKey: string, leagueId: string) {
   const url = createSportsDbUrl(apiKey, "eventsnextleague.php");
   url.searchParams.set("id", leagueId);
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`TheSportsDB request failed with status ${response.status}`);
-  }
+  const response = await fetchLeagueEventsResponse(url);
 
   const data = (await response.json()) as EventsResponse;
   await cache.put(leagueEventsCacheKey(leagueId), JSON.stringify(data), {
