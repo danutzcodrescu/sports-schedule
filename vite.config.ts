@@ -5,7 +5,7 @@ import { devtools } from "@tanstack/devtools-vite";
 import { redact } from "@tanstack/redact/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import viteReact from "@vitejs/plugin-react";
-import { defineConfig, loadEnv, perEnvironmentPlugin } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -28,18 +28,16 @@ export default defineConfig(({ command, mode }) => {
       redact(),
       cloudflare(),
       uploadSourceMaps &&
-        perEnvironmentPlugin("sentry", (environment) =>
-          sentryVitePlugin({
-            org: env.SENTRY_ORG,
-            project: env.SENTRY_PROJECT,
-            authToken: env.SENTRY_AUTH_TOKEN,
-            telemetry: false,
-            sourcemaps: {
-              filesToDeleteAfterUpload:
-                environment.name === "client" ? ["./dist/client/**/*.map"] : undefined,
-            },
-          }),
-        ),
+        // Register at the top level so Vite runs Sentry's configuration hooks.
+        sentryVitePlugin({
+          org: env.SENTRY_ORG,
+          project: env.SENTRY_PROJECT,
+          authToken: env.SENTRY_AUTH_TOKEN,
+          telemetry: false,
+          sourcemaps: {
+            filesToDeleteAfterUpload: ["./dist/client/**/*.map"],
+          },
+        }),
     ],
   };
 });
