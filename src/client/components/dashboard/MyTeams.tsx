@@ -73,8 +73,8 @@ export function MyTeams({
                 <span className="min-w-0 flex-1 truncate font-medium">{team.teamName}</span>
               </SelectionButton>
               <RowRemoveButton
+                busy={isSavingTeams}
                 onClick={() => onRemoveTeam(team.teamId)}
-                disabled={isSavingTeams}
                 aria-label={`Remove ${team.teamName} from favourites`}
               />
             </li>

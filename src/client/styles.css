@@ -157,6 +157,10 @@
   .league-sidebar {
     container: sidebar / size;
   }
+  /* Do not toggle native `disabled` on .row-remove: Button's disabled:opacity-50
+     lives in @layer utilities and would override this components-layer hidden
+     state, revealing every row's control while a change is pending. Use the
+     busy/aria-disabled treatment in RowRemoveButton instead. */
   @media (width >= theme(--breakpoint-lg)) and (hover: hover) and (pointer: fine) {
     .removable-row .row-remove {
       opacity: 0;

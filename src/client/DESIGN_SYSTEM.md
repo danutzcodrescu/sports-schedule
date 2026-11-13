@@ -71,6 +71,10 @@ with text or semantics as well as color.
   does not prove a team's absence. Unverifiable removals fail without changing preferences.
   The league picker commits additions and removals atomically, after any confirmation,
   so cancelling even a refreshed confirmation leaves saved preferences unchanged.
+  While a change is pending, hover-revealed remove buttons use `aria-disabled` and a
+  guarded click handler rather than native `disabled`: the base button's
+  `disabled:opacity-50` utility sits in the utilities layer, so it would override the
+  components-layer hidden state and reveal every row's × until the change finished.
 - Choosing Today, Tomorrow, or Live falls back from Favourites to All when no
   favourite events match, unless an individual team is selected or event data is
   unavailable. Upcoming deliberately keeps the Favourites selection.

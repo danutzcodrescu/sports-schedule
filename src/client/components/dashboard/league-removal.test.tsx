@@ -206,6 +206,23 @@ test("desktop remove buttons are separate from selecting league and team rows", 
   expect(props.onTeamChange).not.toHaveBeenCalled();
 });
 
+test("pending removals keep reveal-on-focus buttons focusable so other rows stay hidden", () => {
+  const props = { ...navigationProps(), isRemovingLeague: true, isSavingTeams: true };
+  render(<LeagueSidebar {...props} userName="Fan" />);
+  const leagueRemove = screen.getByRole("button", {
+    name: "Remove League 1 from followed leagues",
+  });
+  const teamRemove = screen.getByRole("button", { name: "Remove Favourite from favourites" });
+  for (const button of [leagueRemove, teamRemove]) {
+    expect(button.hasAttribute("disabled")).toBe(false);
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+  }
+  fireEvent.click(leagueRemove);
+  fireEvent.click(teamRemove);
+  expect(props.onRemoveLeague).not.toHaveBeenCalled();
+  expect(props.onRemoveTeam).not.toHaveBeenCalled();
+});
+
 test("the mobile menu exposes a separate removal item without selecting the league", async () => {
   const props = navigationProps();
   render(<DashboardHeader {...props} onSearch={vi.fn()} />);

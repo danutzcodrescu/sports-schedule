@@ -97,8 +97,8 @@ export function LeagueSidebar({
                 <span className="min-w-0 flex-1 truncate font-medium">{league.leagueName}</span>
               </SelectionButton>
               <RowRemoveButton
+                busy={isRemovingLeague || teamProps.isSavingTeams}
                 onClick={() => onRemoveLeague(league.leagueId)}
-                disabled={isRemovingLeague || teamProps.isSavingTeams}
                 aria-label={`Remove ${league.leagueName} from followed leagues`}
               />
             </div>
