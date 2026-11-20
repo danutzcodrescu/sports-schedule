@@ -1,69 +1,22 @@
-export type Sport = {
-  idSport: string;
-  strSport: string;
-  strFormat: string;
-  strSportThumb: string | null;
-  strSportDescription: string | null;
-};
+import type {
+  FavouriteTeam,
+  FollowedLeague,
+  League,
+  LiveScore,
+  Sport,
+  SportsEvent,
+  Team,
+} from "../../../shared/sports";
 
-export type League = {
-  idLeague: string;
-  strLeague: string;
-  strSport: string;
-  strCountry: string | null;
-  strBadge: string | null;
-};
-
-export type FollowedLeague = {
-  leagueId: string;
-  leagueName: string;
-  sportName: string;
-  country: string | null;
-  badgeUrl: string | null;
-};
-
-export type SportsEvent = {
-  idEvent: string;
-  strEvent: string;
-  strSport: string;
-  idLeague: string;
-  strLeague: string;
-  strSeason: string | null;
-  dateEvent: string;
-  strTime: string | null;
-  strTimestamp: string | null;
-  idHomeTeam: string | null;
-  strHomeTeam: string | null;
-  strHomeTeamBadge: string | null;
-  idAwayTeam: string | null;
-  strAwayTeam: string | null;
-  strAwayTeamBadge: string | null;
-  strThumb: string | null;
-  strVenue: string | null;
-  intRound: string | null;
-};
-
-export type LiveScore = {
-  idEvent: string;
-  intHomeScore: string | null;
-  intAwayScore: string | null;
-  strStatus: string | null;
-};
-
-export type Team = {
-  idTeam: string;
-  strTeam: string;
-  strCountry: string | null;
-  strBadge: string | null;
-};
-
-export type FavouriteTeam = {
-  teamId: string;
-  leagueId: string;
-  teamName: string;
-  country: string | null;
-  badgeUrl: string | null;
-};
+export type {
+  FavouriteTeam,
+  FollowedLeague,
+  League,
+  LiveScore,
+  Sport,
+  SportsEvent,
+  Team,
+} from "../../../shared/sports";
 
 export async function getLeagueTeams(leagueId: string) {
   const response = await getJson<{ teams: Team[] | null }>(
@@ -77,11 +30,14 @@ export async function getFavouriteTeams() {
   return response.teams;
 }
 
-export function saveFavouriteTeams(teams: FavouriteTeam[]) {
+export function saveFavouriteTeams(changes: {
+  additions: Pick<FavouriteTeam, "teamId" | "leagueId">[];
+  removedTeamIds: string[];
+}) {
   return getJson<{ saved: boolean }>("/api/favourite-teams", {
-    method: "PUT",
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ teams: teams.map(({ teamId, leagueId }) => ({ teamId, leagueId })) }),
+    body: JSON.stringify(changes),
   });
 }
 
@@ -181,8 +137,8 @@ export async function removeFollowedLeagues(
   });
 
   if (response.status === 409) {
-    const body = (await response.json()) as { teams: FavouriteTeam[] };
-    throw new LeagueRemovalConflict(body.teams);
+    const body = (await response.clone().json()) as { teams?: FavouriteTeam[] };
+    if (Array.isArray(body.teams)) throw new LeagueRemovalConflict(body.teams);
   }
   if (!response.ok) {
     throw await createApiError(response);

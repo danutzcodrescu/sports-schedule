@@ -6,6 +6,7 @@ export const leagueEventsQuery = (leagueId: string) =>
     queryKey: ["league-events", leagueId],
     queryFn: () => getLeagueEvents(leagueId),
     staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
   });
 
 export const eventScoreQuery = (eventId: string) =>

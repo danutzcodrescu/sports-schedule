@@ -1,4 +1,5 @@
 import * as sports from "#/lib/api/sports";
+import { AddTeamDialog } from "./AddTeamDialog";
 import { EventCard } from "./EventCard";
 import { SportsDashboard } from "./SportsDashboard";
 import { makeEvent, makeFavouriteTeam, makeLeague } from "./test-fixtures";
@@ -172,7 +173,7 @@ test("live scores poll only visible live events, pause on blur, and resume with 
   expect(getScore).toHaveBeenCalledWith("live", expect.any(AbortSignal));
   expect(result.current.liveCount).toBe(1);
   expect(result.current.liveScoresByEvent.get("live")).toEqual({
-    home: "0",
+    home: undefined,
     away: "2",
     status: "2H",
   });
@@ -301,4 +302,110 @@ test("dashboard controls share selection rules, sidebar labels truncate, and pic
   expect(teamButton.getAttribute("aria-pressed")).toBe("false");
   expect(all.getAttribute("aria-pressed")).toBe("true");
   expect(screen.getByRole("status").textContent).toContain("1 scheduled event");
+});
+
+function openDashboard(client: QueryClient) {
+  clients.push(client);
+  return render(
+    <QueryClientProvider client={client}>
+      <SportsDashboard
+        userName="Fan"
+        leagues={[makeLeague("1"), makeLeague("2")]}
+        favouriteTeams={[]}
+        onTeamsChanged={async () => {}}
+        onLeaguesChanged={async () => {}}
+        onSignOut={async () => {}}
+      />
+    </QueryClientProvider>,
+  );
+}
+
+test("partial league failures show healthy events and never describe a failed league as empty", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  vi.spyOn(sports, "getLeagueEvents").mockImplementation(async (id) => {
+    if (id === "2") throw new Error("League unavailable");
+    return [makeEvent("healthy")];
+  });
+  openDashboard(client);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10);
+  });
+  expect(screen.getByRole("alert").textContent).toContain("Events may be missing");
+  expect(screen.getByRole("status").textContent).toContain("1 scheduled event");
+  fireEvent.click(
+    within(screen.getByRole("complementary")).getByRole("button", { name: "League 2" }),
+  );
+  expect(screen.getByRole("heading", { name: "Events could not be loaded" })).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "No upcoming events" })).toBeNull();
+  fireEvent.click(
+    within(screen.getByRole("complementary")).getByRole("button", { name: "League 1" }),
+  );
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.getByRole("status").textContent).toContain("1 scheduled event");
+});
+
+test("focused dashboards refresh schedules every five minutes, pause on blur, and resume on focus", async () => {
+  const getEvents = vi.spyOn(sports, "getLeagueEvents").mockResolvedValue([makeEvent("initial")]);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  openDashboard(client);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10);
+  });
+  expect(getEvents).toHaveBeenCalledTimes(2);
+  getEvents.mockResolvedValue([makeEvent("new-1"), makeEvent("new-2")]);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+  });
+  expect(getEvents).toHaveBeenCalledTimes(4);
+  expect(screen.getByRole("status").textContent).toContain("2 scheduled events");
+  act(() => focusManager.setFocused(false));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+  });
+  expect(getEvents).toHaveBeenCalledTimes(4);
+  act(() => focusManager.setFocused(true));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10);
+  });
+  expect(getEvents).toHaveBeenCalledTimes(6);
+});
+
+test("team pickers send only explicit changes even when refreshed props omit an old favourite", async () => {
+  const save = vi.spyOn(sports, "saveFavouriteTeams").mockResolvedValue({ saved: true });
+  vi.spyOn(sports, "getLeagueTeams").mockResolvedValue([
+    { idTeam: "10", strTeam: "Old favourite", strCountry: null, strBadge: null },
+    { idTeam: "30", strTeam: "New favourite", strCountry: null, strBadge: null },
+  ]);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  clients.push(client);
+  const props = {
+    followedLeagues: [makeLeague("1")],
+    onOpenChange: vi.fn(),
+    onSaved: async () => {},
+    onAddLeague: vi.fn(),
+  };
+  const view = render(
+    <QueryClientProvider client={client}>
+      <AddTeamDialog {...props} favouriteTeams={[makeFavouriteTeam("10", "1")]} />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: /League 1/ }));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10);
+  });
+  view.rerender(
+    <QueryClientProvider client={client}>
+      <AddTeamDialog {...props} favouriteTeams={[]} />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: /New favourite/ }));
+  expect(screen.getByRole("button", { name: "Done · 1 selected" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Done/ }));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10);
+  });
+  expect(save).toHaveBeenCalledWith({
+    additions: [{ teamId: "30", leagueId: "1" }],
+    removedTeamIds: [],
+  });
 });

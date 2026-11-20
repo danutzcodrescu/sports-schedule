@@ -37,11 +37,9 @@ export const Route = createFileRoute("/")({
     ]);
 
     // Favourites can play in multiple followed competitions, so warm every league's schedule.
-    await Promise.all(
-      leagues.map((league) =>
-        context.queryClient.query(leagueEventsQuery(league.leagueId)).catch(() => undefined),
-      ),
-    );
+    for (const league of leagues) {
+      void context.queryClient.prefetchQuery(leagueEventsQuery(league.leagueId));
+    }
   },
 });
 

@@ -2,8 +2,9 @@ import { requireAuth } from "../auth/middleware";
 import { createDb } from "../db";
 import { favouriteTeam, followedLeague } from "../db/app-schema";
 import { rateLimitMutation, rateLimitRead } from "../rate-limit";
+import { commitPreferences, getPreferenceVersion } from "../services/preferences";
 import { getLeagueTeams } from "../services/sportsdb";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 
 import type { AppEnv } from "../auth/middleware";
@@ -38,20 +39,30 @@ export const favouriteTeamsRoutes = new Hono<AppEnv>()
       .orderBy(favouriteTeam.createdAt, favouriteTeam.teamName);
     return c.json({ teams });
   })
-  .put("/", rateLimitMutation, async (c) => {
-    const body = await c.req.json<{ teams?: unknown }>().catch(() => null);
+  .patch("/", rateLimitMutation, async (c) => {
+    const body = await c.req
+      .json<{ additions?: unknown; removedTeamIds?: unknown }>()
+      .catch(() => null);
     if (
       !body ||
-      !Array.isArray(body.teams) ||
-      body.teams.length > 200 ||
-      !body.teams.every(isTeamSelection)
+      !Array.isArray(body.additions) ||
+      body.additions.length > 200 ||
+      !body.additions.every(isTeamSelection) ||
+      !Array.isArray(body.removedTeamIds) ||
+      body.removedTeamIds.length > 200 ||
+      !body.removedTeamIds.every((id): id is string => typeof id === "string" && /^\d+$/.test(id))
     ) {
       return c.json({ error: "Invalid teams (maximum 200)" }, 400);
     }
 
-    const selections = [...new Map(body.teams.map((team) => [team.teamId, team])).values()];
+    const selections = [...new Map(body.additions.map((team) => [team.teamId, team])).values()];
+    const removedIds = new Set(body.removedTeamIds);
+    if (selections.some((team) => removedIds.has(team.teamId))) {
+      return c.json({ error: "Cannot add and remove the same team" }, 400);
+    }
     const db = createDb(c.env.DB);
     const userId = c.get("user").id;
+    const version = await getPreferenceVersion(db, userId);
     const [existing, leagues] = await Promise.all([
       db.select().from(favouriteTeam).where(eq(favouriteTeam.userId, userId)),
       db.select().from(followedLeague).where(eq(followedLeague.userId, userId)),
@@ -59,6 +70,9 @@ export const favouriteTeamsRoutes = new Hono<AppEnv>()
     const existingById = new Map(existing.map((team) => [team.teamId, team]));
     const followedIds = new Set(leagues.map((league) => league.leagueId));
     const additions = selections.filter((team) => !existingById.has(team.teamId));
+    if (existing.filter((team) => !removedIds.has(team.teamId)).length + additions.length > 200) {
+      return c.json({ error: "Maximum 200 favourite teams" }, 400);
+    }
     if (additions.some((team) => !followedIds.has(team.leagueId))) {
       return c.json({ error: "Follow the team's league first" }, 400);
     }
@@ -76,12 +90,7 @@ export const favouriteTeamsRoutes = new Hono<AppEnv>()
     }
 
     const values: (typeof favouriteTeam.$inferInsert)[] = [];
-    for (const selection of selections) {
-      const saved = existingById.get(selection.teamId);
-      if (saved) {
-        values.push(saved);
-        continue;
-      }
+    for (const selection of additions) {
       const team = catalogues
         .get(selection.leagueId)
         ?.find((team) => team.idTeam === selection.teamId);
@@ -97,9 +106,19 @@ export const favouriteTeamsRoutes = new Hono<AppEnv>()
     }
 
     // One batch keeps multi-league changes atomic. Individual inserts stay within bind limits.
-    await db.batch([
-      db.delete(favouriteTeam).where(eq(favouriteTeam.userId, userId)),
-      ...values.map((team) => db.insert(favouriteTeam).values(team)),
+    const saved = await commitPreferences(db, userId, version, [
+      ...[...removedIds].map((teamId) =>
+        db
+          .delete(favouriteTeam)
+          .where(and(eq(favouriteTeam.userId, userId), eq(favouriteTeam.teamId, teamId))),
+      ),
+      ...values.map((team) => db.insert(favouriteTeam).values(team).onConflictDoNothing()),
     ]);
+    if (!saved) {
+      return c.json(
+        { error: "Preferences changed. Please try again.", code: "PREFERENCES_CHANGED" },
+        409,
+      );
+    }
     return c.json({ saved: true });
   });

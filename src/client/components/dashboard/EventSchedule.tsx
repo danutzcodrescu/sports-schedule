@@ -105,6 +105,12 @@ export function EventSchedule({
           <Badge>Your local time</Badge>
         </div>
 
+        {hasError ? (
+          <p className="alert-error mt-4" role="alert">
+            Some league schedules could not be loaded. Events may be missing or out of date.
+          </p>
+        ) : null}
+
         {isLoading ? (
           <EventLoadingState />
         ) : eventGroups.length ? (

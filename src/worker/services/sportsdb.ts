@@ -1,3 +1,9 @@
+import { getEventStart } from "../../shared/event-time.ts";
+
+import type { League, LiveScore, Sport, SportsEvent } from "../../shared/sports.ts";
+
+export type { LiveScore };
+
 export type LeagueDetails = {
   id: string;
   name: string;
@@ -7,53 +13,91 @@ export type LeagueDetails = {
   syncedAt: number;
 };
 
-type LeagueLookupResponse = {
-  leagues: Array<{
-    idLeague: string;
-    strLeague: string;
-    strSport: string;
-    strCountry: string | null;
-    strBadge: string | null;
-  }> | null;
-};
-
 const SPORTS_DB_BASE_URL = "https://www.thesportsdb.com/api/v1/json";
 const MONTH_IN_SECONDS = 60 * 60 * 24 * 30;
 const THREE_DAYS_IN_SECONDS = 60 * 60 * 24 * 3;
 const EVENT_REQUEST_MAX_RETRIES = 3;
 const EVENT_REQUEST_RETRY_STATUSES = new Set([429, 502, 503, 504]);
-const EVENT_REQUEST_MAX_RETRY_DELAY_MS = 30_000;
+const EVENT_REQUEST_BUDGET_MS = 20_000;
 
 type EventsResponse = {
-  events: Array<{
-    idEvent: string;
-    strEvent: string;
-    strSport: string;
-    idLeague: string;
-    strLeague: string;
-    strSeason: string | null;
-    dateEvent: string;
-    strTime: string | null;
-    strTimestamp: string | null;
-    idHomeTeam: string | null;
-    strHomeTeam: string | null;
-    strHomeTeamBadge: string | null;
-    idAwayTeam: string | null;
-    strAwayTeam: string | null;
-    strAwayTeamBadge: string | null;
-    strThumb: string | null;
-    strVenue: string | null;
-    intRound: string | null;
-    strStatus: string | null;
-  }> | null;
+  events: (SportsEvent & { strStatus?: string | null })[] | null;
 };
 
-export type LiveScore = {
-  idEvent: string;
-  intHomeScore: string | null;
-  intAwayScore: string | null;
-  strStatus: string | null;
-};
+function hasFields(value: unknown, strings: string[], nullableStrings: string[]) {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Record<string, unknown>;
+  return (
+    strings.every((key) => typeof item[key] === "string" && item[key].length > 0) &&
+    nullableStrings.every((key) => item[key] == null || typeof item[key] === "string")
+  );
+}
+
+function parseList<T>(
+  value: unknown,
+  field: string,
+  validItem: (item: unknown) => boolean,
+): T[] | null {
+  if (!value || typeof value !== "object") throw new Error("Invalid TheSportsDB response");
+  const body = value as Record<string, unknown>;
+  if (
+    body.error ||
+    (body[field] !== null && (!Array.isArray(body[field]) || !body[field].every(validItem)))
+  ) {
+    throw new Error("Invalid TheSportsDB response");
+  }
+  return body[field] as T[] | null;
+}
+
+export function parseSportsResponse(value: unknown) {
+  return {
+    sports:
+      parseList<Sport>(value, "sports", (item) =>
+        hasFields(
+          item,
+          ["idSport", "strSport", "strFormat"],
+          ["strSportThumb", "strSportDescription"],
+        ),
+      ) ?? [],
+  };
+}
+
+export function parseLeaguesResponse(value: unknown) {
+  return {
+    countries: parseList<League>(value, "countries", (item) =>
+      hasFields(item, ["idLeague", "strLeague", "strSport"], ["strCountry", "strBadge"]),
+    ),
+  };
+}
+
+function parseEventsResponse(value: unknown): EventsResponse {
+  const events = parseList<SportsEvent>(value, "events", (item) => {
+    if (
+      !hasFields(
+        item,
+        ["idEvent", "strEvent", "strSport", "idLeague", "strLeague", "dateEvent"],
+        [
+          "strSeason",
+          "strTime",
+          "strTimestamp",
+          "idHomeTeam",
+          "strHomeTeam",
+          "strHomeTeamBadge",
+          "idAwayTeam",
+          "strAwayTeam",
+          "strAwayTeamBadge",
+          "strThumb",
+          "strVenue",
+          "intRound",
+          "strStatus",
+        ],
+      )
+    )
+      return false;
+    return Number.isFinite(getEventStart(item as SportsEvent).getTime());
+  });
+  return { events };
+}
 
 export type TeamDetails = {
   idTeam: string;
@@ -144,8 +188,10 @@ export async function getEventScore(apiKey: string, eventId: string) {
     throw new Error(`TheSportsDB request failed with status ${response.status}`);
   }
 
-  const body = (await response.json()) as { events: LiveScore[] | null };
-  const event = body.events?.find((item) => item.idEvent === eventId);
+  const events = parseList<LiveScore>(await response.json(), "events", (item) =>
+    hasFields(item, ["idEvent"], ["intHomeScore", "intAwayScore", "strStatus"]),
+  );
+  const event = events?.find((item) => item.idEvent === eventId);
   if (!event) return null;
 
   return {
@@ -162,7 +208,13 @@ function leagueEventsCacheKey(leagueId: string) {
 
 export async function getLeagueEvents(cache: KVNamespace, apiKey: string, leagueId: string) {
   const cached = await cache.get<EventsResponse>(leagueEventsCacheKey(leagueId), "json");
-  if (cached) return { data: cached, status: "HIT" };
+  if (cached) {
+    try {
+      return { data: parseEventsResponse(cached), status: "HIT" };
+    } catch {
+      // Repair entries written before response validation was introduced.
+    }
+  }
 
   return { data: await refreshLeagueEvents(cache, apiKey, leagueId), status: "MISS" };
 }
@@ -177,14 +229,14 @@ function eventRequestRetryDelay(response: Response, retry: number) {
     ? Math.max(0, seconds * 1_000)
     : Math.max(0, Date.parse(retryAfter) - Date.now());
 
-  // Do not retry earlier than requested, or keep a request waiting indefinitely.
-  if (serverDelay > EVENT_REQUEST_MAX_RETRY_DELAY_MS) return null;
   return Number.isFinite(serverDelay) ? Math.max(backoff, serverDelay) : backoff;
 }
 
 async function fetchLeagueEventsResponse(url: URL) {
+  const deadline = Date.now() + EVENT_REQUEST_BUDGET_MS;
+  const signal = AbortSignal.timeout(EVENT_REQUEST_BUDGET_MS);
   for (let retry = 0; ; retry += 1) {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal });
     if (response.ok) return response;
 
     const delay =
@@ -194,7 +246,7 @@ async function fetchLeagueEventsResponse(url: URL) {
 
     // Release every failed response, including exhausted retries, so later leagues can connect.
     await response.body?.cancel();
-    if (delay === null) {
+    if (delay === null || Date.now() + delay >= deadline) {
       throw new Error(`TheSportsDB request failed with status ${response.status}`);
     }
 
@@ -208,7 +260,7 @@ export async function refreshLeagueEvents(cache: KVNamespace, apiKey: string, le
 
   const response = await fetchLeagueEventsResponse(url);
 
-  const data = (await response.json()) as EventsResponse;
+  const data = parseEventsResponse(await response.json());
   await cache.put(leagueEventsCacheKey(leagueId), JSON.stringify(data), {
     expirationTtl: THREE_DAYS_IN_SECONDS,
   });
@@ -220,7 +272,13 @@ export async function getLeagueDetails(cache: KVNamespace, apiKey: string, leagu
   const cacheKey = `sportsdb:league:${leagueId}:v1`;
   const cached = await cache.get<LeagueDetails>(cacheKey, "json");
 
-  if (cached) return cached;
+  if (
+    cached &&
+    hasFields(cached, ["id", "name", "sportName"], ["country", "badgeUrl"]) &&
+    cached.id === leagueId &&
+    Number.isFinite(cached.syncedAt)
+  )
+    return cached;
 
   const url = createSportsDbUrl(apiKey, "lookupleague.php");
   url.searchParams.set("id", leagueId);
@@ -231,8 +289,10 @@ export async function getLeagueDetails(cache: KVNamespace, apiKey: string, leagu
     throw new Error(`TheSportsDB request failed with status ${response.status}`);
   }
 
-  const body = (await response.json()) as LeagueLookupResponse;
-  const result = body.leagues?.find((item) => item.idLeague === leagueId);
+  const leagues = parseList<League>(await response.json(), "leagues", (item) =>
+    hasFields(item, ["idLeague", "strLeague", "strSport"], ["strCountry", "strBadge"]),
+  );
+  const result = leagues?.find((item) => item.idLeague === leagueId);
 
   if (!result) return null;
 

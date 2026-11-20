@@ -4,6 +4,7 @@ import {
   getEventStatus,
   leagueHasFavouriteTeam,
   shouldFallBackToAllTeams,
+  sortAndDeduplicateEvents,
 } from "./event-utils.ts";
 import { makeEvent as event, makeFavouriteTeam as favouriteTeam } from "./test-fixtures.ts";
 import assert from "node:assert/strict";
@@ -104,4 +105,14 @@ test("marks an event live only during its estimated playing window", () => {
   assert.equal(getEventStatus(soccerEvent, new Date("2026-09-16T10:00:00Z")), "live");
   assert.equal(getEventStatus(soccerEvent, new Date("2026-09-16T12:14:59Z")), "live");
   assert.equal(getEventStatus(soccerEvent, new Date("2026-09-16T12:15:00Z")), "finished");
+});
+
+test("deduplication keeps the first copy, sorts by start, and leaves input untouched", () => {
+  const first = event("first", { strTimestamp: "2026-11-20T12:00:00Z" });
+  const earlier = event("earlier", { strTimestamp: "2026-11-20T11:00:00Z" });
+  const duplicate = { ...first, strEvent: "later copy" };
+  const events = [first, earlier, duplicate];
+  assert.deepEqual(sortAndDeduplicateEvents(events), [earlier, first]);
+  assert.deepEqual(events, [first, earlier, duplicate]);
+  assert.deepEqual(sortAndDeduplicateEvents([]), []);
 });

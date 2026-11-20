@@ -54,10 +54,12 @@ export function useLeagueRemoval(onRemoved: () => Promise<void>) {
     confirmation,
     isPending: mutation.isPending,
     error: mutation.isError
-      ? mutation.error instanceof SportsApiError &&
-        mutation.error.code === "TEAM_MEMBERSHIP_CHECK_FAILED"
-        ? "Could not save your leagues. Team memberships must be checked before removing anything. Please try again."
-        : "Could not save your leagues. Please try again."
+      ? mutation.error instanceof SportsApiError && mutation.error.code === "PREFERENCES_CHANGED"
+        ? "Your preferences changed in another tab. Please try again."
+        : mutation.error instanceof SportsApiError &&
+            mutation.error.code === "TEAM_MEMBERSHIP_CHECK_FAILED"
+          ? "Could not save your leagues. Team memberships must be checked before removing anything. Please try again."
+          : "Could not save your leagues. Please try again."
       : null,
     start: (request: RemovalRequest) => mutation.mutate({ request }),
     confirm: () => {

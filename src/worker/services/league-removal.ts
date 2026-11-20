@@ -1,4 +1,5 @@
 import { favouriteTeam, followedLeague, league } from "../db/app-schema";
+import { commitPreferences, getPreferenceVersion } from "./preferences";
 import { getLeagueTeams, getTeamLeagueIds } from "./sportsdb";
 import { and, eq } from "drizzle-orm";
 
@@ -23,6 +24,7 @@ export async function planLeagueRemoval(
   leagueIds: string[],
   additionalLeagueIds: string[] = [],
 ) {
+  const version = await getPreferenceVersion(db, userId);
   const [leagues, teams] = await Promise.all([
     db.select().from(followedLeague).where(eq(followedLeague.userId, userId)),
     db
@@ -86,7 +88,7 @@ export async function planLeagueRemoval(
     }
   }
 
-  return { leagueIds: [...removedLeagueIds], teamsToRemove, teamsToReassign };
+  return { version, leagueIds: [...removedLeagueIds], teamsToRemove, teamsToReassign };
 }
 
 export async function applyLeagueRemoval(
@@ -115,6 +117,5 @@ export async function applyLeagueRemoval(
         .where(and(eq(followedLeague.userId, userId), eq(followedLeague.leagueId, leagueId))),
     ),
   ];
-  const [first, ...rest] = statements;
-  if (first) await db.batch([first, ...rest]);
+  return commitPreferences(db, userId, plan.version, statements);
 }

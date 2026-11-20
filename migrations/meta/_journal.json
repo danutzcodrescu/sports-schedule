@@ -29,6 +29,13 @@
       "when": 1789586014083,
       "tag": "0003_organic_lady_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1795172383025,
+      "tag": "0004_natural_valeria_richards",
+      "breakpoints": true
     }
   ]
 }

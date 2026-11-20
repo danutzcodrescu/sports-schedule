@@ -8,6 +8,7 @@ import {
   planLeagueRemoval,
   TeamMembershipCheckError,
 } from "../services/league-removal";
+import { commitPreferences, getPreferenceVersion } from "../services/preferences";
 import { getLeagueDetails } from "../services/sportsdb";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
@@ -81,7 +82,12 @@ async function removeLeagues(
     return c.json({ error: "Could not check league additions. Nothing was changed." }, 502);
   }
   // No preferences are persisted before confirmation, including league additions.
-  await applyLeagueRemoval(db, userId, plan, additionalLeagues);
+  if (!(await applyLeagueRemoval(db, userId, plan, additionalLeagues))) {
+    return c.json(
+      { error: "Preferences changed. Please try again.", code: "PREFERENCES_CHANGED" },
+      409,
+    );
+  }
   return c.body(null, 204);
 }
 
@@ -130,7 +136,18 @@ export const followedLeaguesRoutes = new Hono<AppEnv>()
 
     const db = createDb(c.env.DB);
 
-    await db.batch(followLeagueStatements(db, c.get("user").id, details));
+    const userId = c.get("user").id;
+    const version = await getPreferenceVersion(db, userId);
+    if (
+      !(await commitPreferences(db, userId, version, [
+        ...followLeagueStatements(db, userId, details),
+      ]))
+    ) {
+      return c.json(
+        { error: "Preferences changed. Please try again.", code: "PREFERENCES_CHANGED" },
+        409,
+      );
+    }
 
     return c.json(
       {

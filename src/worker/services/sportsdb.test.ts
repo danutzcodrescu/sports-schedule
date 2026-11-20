@@ -1,4 +1,13 @@
-import { getEventScore, getLeagueEvents, getLeagueTeams, refreshLeagueEvents } from "./sportsdb.ts";
+import { makeEvent } from "../../client/components/dashboard/test-fixtures.ts";
+import {
+  getEventScore,
+  getLeagueEvents,
+  getLeagueTeams,
+  getLeagueDetails,
+  refreshLeagueEvents,
+  parseSportsResponse,
+  parseLeaguesResponse,
+} from "./sportsdb.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -110,7 +119,7 @@ test("league team lookup distinguishes an unavailable catalogue from a valid emp
 
 test("league event refresh bypasses stale cache data and replaces it", async (context) => {
   const staleEvents = { events: [{ idEvent: "old" }] };
-  const freshEvents = { events: [{ idEvent: "new" }] };
+  const freshEvents = { events: [makeEvent("new")] };
   const entries = new Map([["sportsdb:events:4335:v1", JSON.stringify(staleEvents)]]);
   const writes: Array<{ key: string; value: string; expirationTtl?: number }> = [];
   const cache = {
@@ -139,7 +148,7 @@ test("league event refresh bypasses stale cache data and replaces it", async (co
 
 test("league event refresh retries a transient 503 before replacing cached data", async (context) => {
   const staleValue = JSON.stringify({ events: [{ idEvent: "old" }] });
-  const freshEvents = { events: [{ idEvent: "new" }] };
+  const freshEvents = { events: [makeEvent("new")] };
   const entries = new Map([["sportsdb:events:4335:v1", staleValue]]);
   const cache = {
     put: async (key: string, value: string) => {
@@ -192,7 +201,7 @@ test("league event refresh preserves cached data when the upstream request fails
 for (const status of [429, 502, 503, 504]) {
   test(`league event refresh can recover from ${status} on its final retry`, async (context) => {
     const delays = mockRetryTimers(context);
-    const events = { events: [{ idEvent: "new" }] };
+    const events = { events: [makeEvent("new")] };
     const writes: string[] = [];
     const cache = {
       put: async (_key: string, value: string) => {
@@ -316,7 +325,7 @@ test("league event refresh does not retry KV write failures", async (context) =>
 });
 
 test("event reads reuse cached data and share refresh retrieval and expiration on a miss", async (context) => {
-  const events = { events: [{ idEvent: "new" }] };
+  const events = { events: [makeEvent("new")] };
   const entries = new Map<string, string>();
   const writes: Array<{ key: string; expirationTtl?: number }> = [];
   const cache = {
@@ -343,7 +352,7 @@ test("event reads reuse cached data and share refresh retrieval and expiration o
   assert.equal(fetchMock.mock.callCount(), 1);
   assert.deepEqual(writes, [{ key: "sportsdb:events:4335:v1", expirationTtl: 60 * 60 * 24 * 3 }]);
 
-  const refreshed = { events: [{ idEvent: "refreshed" }] };
+  const refreshed = { events: [makeEvent("refreshed")] };
   fetchMock.mock.mockImplementation(async () => Response.json(refreshed));
   await refreshLeagueEvents(cache, "test-key", "4335");
   assert.deepEqual(await getLeagueEvents(cache, "test-key", "4335"), {
@@ -406,4 +415,124 @@ test("event score lookup returns null for missing events and rejects upstream fa
   assert.equal(await getEventScore("test-key", "123"), null);
   fetchMock.mock.mockImplementation(async () => new Response(null, { status: 503 }));
   await assert.rejects(getEventScore("test-key", "123"), /status 503/);
+});
+
+for (const body of [
+  { error: "Unavailable" },
+  { events: [], error: "Unavailable" },
+  { events: {} },
+  { events: [{}] },
+  { events: [makeEvent("bad-date", { dateEvent: "invalid", strTime: null, strTimestamp: null })] },
+  { events: [makeEvent("bad-sport", { strSport: null as unknown as string })] },
+]) {
+  test(`invalid event responses preserve a good cache: ${JSON.stringify(body)}`, async (context) => {
+    const previous = JSON.stringify({ events: [makeEvent("existing")] });
+    let stored = previous;
+    const cache = {
+      put: async (_key: string, value: string) => {
+        stored = value;
+      },
+    } as unknown as KVNamespace;
+    context.mock.method(globalThis, "fetch", async () => Response.json(body));
+    await assert.rejects(refreshLeagueEvents(cache, "test", "1"), /Invalid TheSportsDB response/);
+    assert.equal(stored, previous);
+  });
+}
+
+test("invalid old event cache entries are repaired instead of returned", async (context) => {
+  const events = { events: [makeEvent("fresh")] };
+  const cache = {
+    get: async () => ({ error: "old cached error" }),
+    put: async () => {},
+  } as unknown as KVNamespace;
+  context.mock.method(globalThis, "fetch", async () => Response.json(events));
+  assert.deepEqual(await getLeagueEvents(cache, "test", "1"), { data: events, status: "MISS" });
+});
+
+test("sports and league lists reject errors and malformed records", () => {
+  for (const body of [
+    { error: "Unavailable" },
+    { sports: [{}] },
+    { sports: [], error: "Unavailable" },
+  ]) {
+    assert.throws(() => parseSportsResponse(body), /Invalid TheSportsDB response/);
+  }
+  for (const body of [
+    { error: "Unavailable" },
+    { countries: [{}] },
+    { countries: {}, error: "Unavailable" },
+  ]) {
+    assert.throws(() => parseLeaguesResponse(body), /Invalid TheSportsDB response/);
+  }
+  assert.deepEqual(parseLeaguesResponse({ countries: null }), { countries: null });
+});
+
+test("Retry-After never consumes more than the league's total retry budget", async (context) => {
+  let now = 0;
+  context.mock.method(Date, "now", () => now);
+  const delays: number[] = [];
+  context.mock.method(globalThis, "setTimeout", (callback: () => void, delay: number) => {
+    delays.push(delay);
+    now += delay;
+    callback();
+  });
+  const fetchMock = context.mock.method(
+    globalThis,
+    "fetch",
+    async (_url: URL, options?: RequestInit) => {
+      assert.ok(options?.signal instanceof AbortSignal);
+      return new Response(null, { status: 503, headers: { "Retry-After": "10" } });
+    },
+  );
+  const cache = {
+    put: async () => assert.fail("Failed responses must not be cached"),
+  } as unknown as KVNamespace;
+  await assert.rejects(refreshLeagueEvents(cache, "test", "1"), /status 503/);
+  assert.deepEqual(delays, [10_000]);
+  assert.equal(fetchMock.mock.callCount(), 2);
+});
+
+test("provider fetches are aborted when the league budget expires", async (context) => {
+  context.mock.method(AbortSignal, "timeout", (milliseconds: number) => {
+    assert.equal(milliseconds, 20_000);
+    return AbortSignal.abort(new DOMException("Timed out", "TimeoutError"));
+  });
+  context.mock.method(globalThis, "fetch", async (_url: URL, options?: RequestInit) => {
+    options?.signal?.throwIfAborted();
+    assert.fail("Expected an aborted signal");
+  });
+  const cache = {
+    put: async () => assert.fail("Timeouts must not be cached"),
+  } as unknown as KVNamespace;
+  await assert.rejects(refreshLeagueEvents(cache, "test", "1"), { name: "TimeoutError" });
+});
+
+test("league details reject provider errors before caching and repair malformed cached entries", async (context) => {
+  const writes: string[] = [];
+  const cache = {
+    get: async () => ({ error: "Old cached failure" }),
+    put: async (_key: string, value: string) => {
+      writes.push(value);
+    },
+  } as unknown as KVNamespace;
+  const fetchMock = context.mock.method(globalThis, "fetch", async () =>
+    Response.json({ error: "Unavailable" }),
+  );
+  await assert.rejects(getLeagueDetails(cache, "test", "1"), /Invalid TheSportsDB response/);
+  assert.deepEqual(writes, []);
+  fetchMock.mock.mockImplementation(async () =>
+    Response.json({
+      leagues: [
+        {
+          idLeague: "1",
+          strLeague: "League 1",
+          strSport: "Soccer",
+          strCountry: null,
+          strBadge: null,
+        },
+      ],
+    }),
+  );
+  assert.equal((await getLeagueDetails(cache, "test", "1"))?.name, "League 1");
+  assert.equal(writes.length, 1);
 });

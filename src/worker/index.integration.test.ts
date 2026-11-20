@@ -155,3 +155,24 @@ test("scheduled job failures are reported and still reject", async () => {
     expect.objectContaining({ originalException: error }),
   );
 });
+
+test("API and sign-in rate limits reject requests before authentication work", async () => {
+  const { env, limit } = environment("true");
+  limit.mockResolvedValueOnce({ success: false });
+  const api = await worker.fetch(new Request("https://example.test/api/favourite-teams"), env);
+  expect(api.status).toBe(429);
+  expect(api.headers.get("Retry-After")).toBe("60");
+  const signInLimit = vi.fn(async () => ({ success: false }));
+  env.SIGN_IN_RATE_LIMITER = { limit: signInLimit };
+  const signIn = await worker.fetch(
+    new Request("https://example.test/api/auth/sign-in/email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "fan@example.test" }),
+    }),
+    env,
+  );
+  expect(signIn.status).toBe(429);
+  expect(signInLimit).toHaveBeenCalledTimes(1);
+  expect(JSON.stringify(signInLimit.mock.calls)).not.toContain("fan@example.test");
+});

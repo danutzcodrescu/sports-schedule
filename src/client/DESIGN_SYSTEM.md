@@ -56,7 +56,10 @@ with text or semantics as well as color.
   Touch controls retain the shared coarse-pointer target size. On mobile, My Teams
   is available in an expandable section beneath the league menu.
 - The team picker uses the same two-step dialog pattern as leagues. Selections are
-  retained when changing leagues and saved together on Done. Favourites/All is an
+  retained when changing leagues and saved together on Done. Only explicit additions
+  and removals are sent, so an older picker cannot undo another tab's unrelated edits.
+  Overlapping preference writes fail without changing data and can be retried.
+  Favourites/All is an
   independent schedule filter, defaults to Favourites, and falls back to all teams
   when no favourites exist. Clicking a team in My Teams selects that team's events
   within the current league and period filters; clicking it again restores the

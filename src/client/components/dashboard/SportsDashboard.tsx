@@ -46,8 +46,7 @@ export function SportsDashboard({
     requireReset: true,
   });
   const removeTeamMutation = useMutation({
-    mutationFn: (teamId: string) =>
-      saveFavouriteTeams(favouriteTeams.filter((team) => team.teamId !== teamId)),
+    mutationFn: (teamId: string) => saveFavouriteTeams({ additions: [], removedTeamIds: [teamId] }),
     onSuccess: onTeamsChanged,
   });
   const eventQueries = useQueries({
@@ -56,7 +55,7 @@ export function SportsDashboard({
 
   const allEvents = sortAndDeduplicateEvents(eventQueries.flatMap((query) => query.data ?? []));
   const isLoading = eventQueries.some((query) => query.isPending);
-  const hasError = eventQueries.length > 0 && eventQueries.every((query) => query.isError);
+  const hasError = eventQueries.some((query) => query.isError);
   const schedule = useEventSchedule({
     leagues,
     favouriteTeams,
@@ -65,6 +64,9 @@ export function SportsDashboard({
     hasError,
   });
   const { selectedTeam, selectedLeagueId, changeSelection } = schedule;
+  const relevantQueries = selectedLeagueId
+    ? eventQueries.filter((_, index) => leagues[index].leagueId === selectedLeagueId)
+    : eventQueries;
   const changeLeague = (leagueId: string | null) => changeSelection({ type: "league", leagueId });
   const teamProps = {
     teams: favouriteTeams,
@@ -111,8 +113,10 @@ export function SportsDashboard({
           />
           <EventSchedule
             schedule={schedule}
-            isLoading={isLoading}
-            hasError={hasError}
+            isLoading={
+              relevantQueries.some((query) => query.isPending) && !schedule.visibleEvents.length
+            }
+            hasError={relevantQueries.some((query) => query.isError)}
             hasLeagues={Boolean(leagues.length)}
             onAddLeague={() => setDialogOpen(true)}
           />

@@ -15,7 +15,7 @@ import type { ScheduleFilter, TeamFilter } from "./event-utils";
 
 const LIVE_SCORE_POLL_INTERVAL = 60 * 1000;
 
-export type EventScore = { home: string; away: string; status: string };
+export type EventScore = { home?: string; away?: string; status: string };
 
 type ScheduleSelection = {
   leagueId: string | null;
@@ -57,7 +57,7 @@ export function useEventSchedule(context: ScheduleContext) {
   );
   const visibleEvents = filterEvents(teamEvents, selection.period, now);
   const liveScores = useQueries({
-    queries: (isLoading ? [] : visibleEvents)
+    queries: visibleEvents
       .filter((event) => getEventStatus(event, now) === "live")
       .map((event) => ({
         ...eventScoreQuery(event.idEvent),
@@ -69,8 +69,8 @@ export function useEventSchedule(context: ScheduleContext) {
   for (const { data } of liveScores) {
     if (data) {
       liveScoresByEvent.set(data.idEvent, {
-        home: data.intHomeScore ?? "0",
-        away: data.intAwayScore ?? "0",
+        home: data.intHomeScore ?? undefined,
+        away: data.intAwayScore ?? undefined,
         status: data.strStatus || "live",
       });
     }

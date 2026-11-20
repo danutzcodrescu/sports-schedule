@@ -10,8 +10,13 @@ export async function refreshEventCaches(env: CloudflareBindings) {
     db.select({ leagueId: favouriteTeam.leagueId }).from(favouriteTeam),
   );
   const failedLeagueIds: string[] = [];
+  const deadline = Date.now() + 12 * 60 * 1000;
 
-  for (const { leagueId } of leagues) {
+  for (const [index, { leagueId }] of leagues.entries()) {
+    if (Date.now() >= deadline) {
+      failedLeagueIds.push(...leagues.slice(index).map((league) => league.leagueId));
+      break;
+    }
     try {
       await refreshLeagueEvents(env.SPORTS_CACHE, env.SPORTSDB_API_KEY, leagueId);
     } catch (error) {

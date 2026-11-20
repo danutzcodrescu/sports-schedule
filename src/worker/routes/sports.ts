@@ -5,30 +5,12 @@ import {
   getLeagueEvents,
   getLeagueTeams,
   getEventScore,
+  parseSportsResponse,
+  parseLeaguesResponse,
 } from "../services/sportsdb";
 import { Hono } from "hono";
 
 import type { AppEnv } from "../auth/middleware";
-
-type SportsResponse = {
-  sports: Array<{
-    idSport: string;
-    strSport: string;
-    strFormat: string;
-    strSportThumb: string | null;
-    strSportDescription: string | null;
-  }>;
-};
-
-type LeaguesResponse = {
-  countries: Array<{
-    idLeague: string;
-    strLeague: string;
-    strSport: string;
-    strCountry: string | null;
-    strBadge: string | null;
-  }> | null;
-};
 
 type CacheResult<T> = {
   data: T;
@@ -43,14 +25,19 @@ async function getCachedJson<T>(
   key: string,
   url: URL,
   expirationTtl: number,
+  parse: (value: unknown) => T,
 ): Promise<CacheResult<T> | null> {
   const endpoint = url.pathname.slice(url.pathname.lastIndexOf("/") + 1);
 
   try {
-    const cached = await cache.get<T>(key, "json");
+    const cached = await cache.get<unknown>(key, "json");
 
     if (cached) {
-      return { data: cached, status: "HIT" };
+      try {
+        return { data: parse(cached), status: "HIT" };
+      } catch {
+        // Repair entries written before response validation was introduced.
+      }
     }
 
     const response = await fetch(url);
@@ -60,7 +47,7 @@ async function getCachedJson<T>(
       return null;
     }
 
-    const data = (await response.json()) as T;
+    const data = parse(await response.json());
 
     await cache.put(key, JSON.stringify(data), { expirationTtl });
 
@@ -75,11 +62,12 @@ export const sportsRoutes = new Hono<AppEnv>()
   .use("*", requireAuth)
   .use("*", rateLimitSports)
   .get("/", async (c) => {
-    const result = await getCachedJson<SportsResponse>(
+    const result = await getCachedJson(
       c.env.SPORTS_CACHE,
       SPORTS_CACHE_KEY,
       createSportsDbUrl(c.env.SPORTSDB_API_KEY, "all_sports.php"),
       MONTH_IN_SECONDS,
+      parseSportsResponse,
     );
 
     if (!result) {
@@ -100,11 +88,12 @@ export const sportsRoutes = new Hono<AppEnv>()
     const url = createSportsDbUrl(c.env.SPORTSDB_API_KEY, "search_all_leagues.php");
     url.searchParams.set("s", sport);
 
-    const result = await getCachedJson<LeaguesResponse>(
+    const result = await getCachedJson(
       c.env.SPORTS_CACHE,
       `sportsdb:leagues:${sport.toLowerCase()}:v1`,
       url,
       MONTH_IN_SECONDS,
+      parseLeaguesResponse,
     );
 
     if (!result) {
@@ -147,7 +136,23 @@ export const sportsRoutes = new Hono<AppEnv>()
     }
 
     try {
+      // shortcut: scores are cached regionally without merging concurrent misses; coordinate if quotas require it.
+      const cacheKey = new Request(new URL(`/sports-score-cache/v1/${eventId}`, c.req.url));
+      const cache = await caches.open("sports-scores").catch(() => undefined);
+      const cached = await cache?.match(cacheKey).catch(() => undefined);
+      if (cached) return c.json(await cached.json());
       const score = await getEventScore(c.env.SPORTSDB_API_KEY, eventId);
+      await cache
+        ?.put(
+          cacheKey,
+          Response.json(
+            { score },
+            {
+              headers: { "Cache-Control": "public, max-age=30" },
+            },
+          ),
+        )
+        .catch((error) => console.warn("Failed to cache live score", { error }));
       return c.json({ score });
     } catch (error) {
       console.error("Failed to fetch event score", { eventId, error });

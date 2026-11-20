@@ -10,7 +10,7 @@ import {
 } from "#/components/ui/Dialog";
 import { Input } from "#/components/ui/Input";
 import { SelectionButton } from "#/components/ui/SelectionButton";
-import { getLeagueTeams, saveFavouriteTeams } from "#/lib/api/sports";
+import { getLeagueTeams, saveFavouriteTeams, SportsApiError } from "#/lib/api/sports";
 import {
   ArrowLeft01Icon,
   CheckmarkCircle02Icon,
@@ -41,6 +41,8 @@ export function AddTeamDialog({
   onAddLeague,
 }: AddTeamDialogProps) {
   const [selectedLeague, setSelectedLeague] = useState<FollowedLeague | null>(null);
+  const [initialTeams] = useState(favouriteTeams);
+  const initialTeamIds = new Set(initialTeams.map((team) => team.teamId));
   const [selectedTeams, setSelectedTeams] = useState(
     () => new Map(favouriteTeams.map((team) => [team.teamId, team])),
   );
@@ -53,7 +55,15 @@ export function AddTeamDialog({
     staleTime: 30 * 60 * 1000,
   });
   const saveMutation = useMutation({
-    mutationFn: () => saveFavouriteTeams([...selectedTeams.values()]),
+    mutationFn: () =>
+      saveFavouriteTeams({
+        additions: [...selectedTeams.values()]
+          .filter((team) => !initialTeamIds.has(team.teamId))
+          .map(({ teamId, leagueId }) => ({ teamId, leagueId })),
+        removedTeamIds: initialTeams
+          .filter((team) => !selectedTeams.has(team.teamId))
+          .map((team) => team.teamId),
+      }),
     onSuccess: async () => {
       await onSaved();
       onOpenChange(false);
@@ -67,9 +77,8 @@ export function AddTeamDialog({
   const teams = (teamsQuery.data ?? []).filter((team) =>
     `${team.strTeam} ${team.strCountry ?? ""}`.toLowerCase().includes(deferredSearch),
   );
-  const favouriteTeamIds = new Set(favouriteTeams.map((team) => team.teamId));
   const newSelectionCount = [...selectedTeams.keys()].filter(
-    (teamId) => !favouriteTeamIds.has(teamId),
+    (teamId) => !initialTeamIds.has(teamId),
   ).length;
 
   function changeLeague(league: FollowedLeague | null) {
@@ -149,7 +158,10 @@ export function AddTeamDialog({
           </div>
           {saveMutation.isError ? (
             <div className="alert-error mb-4" role="alert">
-              Your favourite teams could not be saved. Please try again.
+              {saveMutation.error instanceof SportsApiError &&
+              saveMutation.error.code === "PREFERENCES_CHANGED"
+                ? "Your preferences changed in another tab. Please try again."
+                : "Your favourite teams could not be saved. Please try again."}
             </div>
           ) : null}
           {!selectedLeague ? (

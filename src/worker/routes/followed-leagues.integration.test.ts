@@ -1,11 +1,13 @@
 // @vitest-environment node
+import { createDb } from "../db";
+import { applyLeagueRemoval, planLeagueRemoval } from "../services/league-removal";
+import { createTestDatabase } from "../test-fixtures";
 import { followedLeaguesRoutes } from "./followed-leagues";
-import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import type { AppEnv } from "../auth/middleware";
 import type { Context, Next } from "hono";
-import type { SQLInputValue } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
 
 vi.mock("../auth/middleware", () => ({
   requireAuth: async (c: Context<AppEnv>, next: Next) => {
@@ -39,43 +41,19 @@ function teamDetails(idTeam: string, idLeague = "1") {
   };
 }
 
-// Exercise real Drizzle SQL and transactional batches with an in-memory SQLite database.
-function prepare(sql: string, values: SQLInputValue[] = []) {
-  const statement = sqlite.prepare(sql);
-  return {
-    bind: (...params: SQLInputValue[]) => prepare(sql, params),
-    raw: async () => statement.all(...values).map(Object.values),
-    execute: () => ({ results: statement.all(...values), success: true, meta: {} }),
-  };
-}
-
 beforeEach(() => {
-  sqlite = new DatabaseSync(":memory:");
-  sqlite.exec(`
-    CREATE TABLE league (id TEXT PRIMARY KEY, name TEXT, sport_name TEXT, country TEXT, badge_url TEXT, synced_at INTEGER);
-    CREATE TABLE followed_league (user_id TEXT, league_id TEXT, created_at INTEGER DEFAULT 0, PRIMARY KEY (user_id, league_id));
-    CREATE TABLE favourite_team (user_id TEXT, team_id TEXT, league_id TEXT, team_name TEXT, country TEXT, badge_url TEXT, created_at INTEGER DEFAULT 0, PRIMARY KEY (user_id, team_id));
-  `);
+  const database = createTestDatabase();
+  sqlite = database.sqlite;
+  sqlite.exec(
+    `INSERT INTO user (id, name, email) VALUES ('fan', 'Fan', 'fan@example.test'), ('other', 'Other', 'other@example.test')`,
+  );
   catalogues = new Map([
     ["1", ["10"]],
     ["2", []],
   ]);
   rawCatalogues = new Map();
   env = {
-    DB: {
-      prepare,
-      batch: async (statements: ReturnType<typeof prepare>[]) => {
-        sqlite.exec("BEGIN");
-        try {
-          const results = statements.map((statement) => statement.execute());
-          sqlite.exec("COMMIT");
-          return results;
-        } catch (error) {
-          sqlite.exec("ROLLBACK");
-          throw error;
-        }
-      },
-    },
+    DB: database.d1,
     SPORTS_CACHE: {
       get: async (key: string) => {
         const [, kind, leagueId] = key.split(":");
@@ -105,17 +83,25 @@ beforeEach(() => {
 afterEach(() => sqlite.close());
 
 function follow(leagueId: string, userId = "fan") {
+  seedLeague(leagueId);
   sqlite
     .prepare("INSERT INTO followed_league (user_id, league_id) VALUES (?, ?)")
     .run(userId, leagueId);
 }
 
 function favourite(teamId: string, leagueId: string, userId = "fan") {
+  seedLeague(leagueId);
   sqlite
     .prepare(
       "INSERT INTO favourite_team (user_id, team_id, league_id, team_name) VALUES (?, ?, ?, ?)",
     )
     .run(userId, teamId, leagueId, `Team ${teamId}`);
+}
+
+function seedLeague(leagueId: string) {
+  sqlite
+    .prepare("INSERT OR IGNORE INTO league (id, name, sport_name) VALUES (?, ?, 'Soccer')")
+    .run(leagueId, `League ${leagueId}`);
 }
 
 function request(path: string, method: string, body?: unknown) {
@@ -300,7 +286,7 @@ test("conflicting mixed changes persist no additions before confirmation", async
   expect(sqlite.prepare("SELECT league_id FROM followed_league").all()).toMatchObject([
     { league_id: "1" },
   ]);
-  expect(sqlite.prepare("SELECT * FROM league").all()).toHaveLength(0);
+  expect(sqlite.prepare("SELECT id FROM league").all()).toEqual([{ id: "1" }]);
 });
 
 test("addition-only changes use the same atomic preference update", async () => {
@@ -348,7 +334,7 @@ test.each([{ additionalLeagueIds: [] }, { additionalLeagueIds: ["2"] }])(
     ).toBe(500);
     expect(savedTeams()).toHaveLength(1);
     expect(sqlite.prepare("SELECT * FROM followed_league").all()).toHaveLength(1);
-    expect(sqlite.prepare("SELECT * FROM league").all()).toHaveLength(0);
+    expect(sqlite.prepare("SELECT id FROM league").all()).toEqual([{ id: "1" }]);
   },
 );
 
@@ -361,4 +347,43 @@ test.each([
   ["/bad", "DELETE", {}],
 ])("invalid removal input is rejected (%s %s)", async (path, method, body) => {
   expect((await request(path, method, body)).status).toBe(400);
+});
+
+test("concurrent removal plans cannot leave a favourite in an unfollowed league", async () => {
+  follow("1");
+  follow("2");
+  favourite("10", "1");
+  catalogues.set("2", ["10"]);
+  const db = createDb(env.DB);
+  const first = await planLeagueRemoval(db, env.SPORTS_CACHE, "test", "fan", ["1"]);
+  const second = await planLeagueRemoval(db, env.SPORTS_CACHE, "test", "fan", ["2"]);
+  expect(await applyLeagueRemoval(db, "fan", first)).toBe(true);
+  expect(await applyLeagueRemoval(db, "fan", second)).toBe(false);
+  expect(savedTeams()).toEqual([{ user_id: "fan", team_id: "10", league_id: "2" }]);
+  expect(sqlite.prepare("SELECT league_id FROM followed_league").all()).toEqual([
+    { league_id: "2" },
+  ]);
+  expect((await request("/2", "DELETE")).status).toBe(409);
+});
+
+test("a database-side stale write returns a retryable conflict and persists no additions", async () => {
+  follow("1");
+  env.SPORTS_CACHE = {
+    get: async () => {
+      sqlite.exec("INSERT INTO preference_revision (user_id, version) VALUES ('fan', 1)");
+      return {
+        id: "2",
+        name: "League 2",
+        sportName: "Soccer",
+        country: null,
+        badgeUrl: null,
+        syncedAt: 0,
+      };
+    },
+    put: async () => {},
+  } as unknown as KVNamespace;
+  const response = await request("/", "DELETE", { leagueIds: [], additionalLeagueIds: ["2"] });
+  expect(response.status).toBe(409);
+  expect(await response.json()).toMatchObject({ code: "PREFERENCES_CHANGED" });
+  expect(sqlite.prepare("SELECT id FROM league").all()).toEqual([{ id: "1" }]);
 });

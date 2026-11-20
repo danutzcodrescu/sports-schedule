@@ -1,4 +1,8 @@
+import { getEventStart } from "../../../shared/event-time.ts";
+
 import type { FavouriteTeam, SportsEvent } from "#/lib/api/sports";
+
+export { getEventStart };
 
 export type ScheduleFilter = "upcoming" | "live" | "today" | "tomorrow";
 export type TeamFilter = "favourites" | "all";
@@ -15,18 +19,6 @@ const EVENT_DURATION_MINUTES: Record<string, number> = {
   rugby: 150,
   motorsport: 180,
 };
-
-export function getEventStart(event: SportsEvent) {
-  if (event.strTimestamp) {
-    // TheSportsDB timestamps are UTC but do not include a timezone suffix.
-    const hasTimeZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(event.strTimestamp);
-    const timestamp = new Date(`${event.strTimestamp}${hasTimeZone ? "" : "Z"}`);
-    if (!Number.isNaN(timestamp.getTime())) return timestamp;
-  }
-
-  const time = (event.strTime || "00:00:00").replace(/Z$/, "");
-  return new Date(`${event.dateEvent}T${time}Z`);
-}
 
 export function getEventStatus(event: SportsEvent, now: Date): EventStatus {
   const start = getEventStart(event);
@@ -66,11 +58,13 @@ export function formatDayHeading(date: Date, now: Date) {
 }
 
 export function sortAndDeduplicateEvents(events: SportsEvent[]) {
+  const seen = new Set<string>();
   return events
-    .filter(
-      (event, index) =>
-        events.findIndex((candidate) => candidate.idEvent === event.idEvent) === index,
-    )
+    .filter((event) => {
+      if (seen.has(event.idEvent)) return false;
+      seen.add(event.idEvent);
+      return true;
+    })
     .sort((left, right) => getEventStart(left).getTime() - getEventStart(right).getTime());
 }
 

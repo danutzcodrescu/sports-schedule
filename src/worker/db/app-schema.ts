@@ -2,6 +2,13 @@ import { user } from "./auth-schema";
 import { relations, sql } from "drizzle-orm";
 import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
+export const preferenceRevision = sqliteTable("preference_revision", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+});
+
 export const league = sqliteTable("league", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),

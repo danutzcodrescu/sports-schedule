@@ -175,6 +175,27 @@ test("a stale preview prompts for the updated teams before retrying", async () =
   await waitFor(() => expect(remove).toHaveBeenLastCalledWith(["1"], ["20"], []));
 });
 
+test("a concurrent preference change asks for a retry without opening an invalid confirmation", async () => {
+  let conflict = true;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url) => {
+      if (String(url).endsWith("/removal-preview")) return Response.json({ teams: [] });
+      return conflict
+        ? Response.json({ code: "PREFERENCES_CHANGED" }, { status: 409 })
+        : new Response(null, { status: 204 });
+    }),
+  );
+  const onRemoved = vi.fn(async () => {});
+  openRemoval({ onRemoved });
+  expect((await screen.findByRole("alert")).textContent).toContain("changed in another tab");
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(onRemoved).not.toHaveBeenCalled();
+  conflict = false;
+  fireEvent.click(screen.getByRole("button", { name: "Remove League 1" }));
+  await waitFor(() => expect(onRemoved).toHaveBeenCalledTimes(1));
+});
+
 function navigationProps() {
   return {
     leagues: [makeLeague("1")],

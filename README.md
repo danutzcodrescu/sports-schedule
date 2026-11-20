@@ -125,7 +125,9 @@ Update `wrangler.jsonc` with the returned database and namespace IDs. If you cho
 
 Choose an available Worker `name` and distinct rate-limit `namespace_id` values within your account. The template runs the event-cache refresh every day at **00:00 UTC** for leagues referenced by followed leagues or favourite teams.
 
-Event retrieval retries HTTP 429, 502, 503, and 504 responses up to three times after the initial request, with exponential backoff and jitter (0.5–1, 1–2, then 2–4 seconds). `Retry-After` is respected up to 30 seconds; longer waits fail without retrying early. Failed refreshes preserve existing cache entries until their original expiry. The daily job continues with other leagues and reports any remaining failures to Sentry; persistent failures are retried on the next scheduled run.
+Event retrieval retries HTTP 429, 502, 503, and 504 responses up to three times after the initial request, with exponential backoff and jitter (0.5–1, 1–2, then 2–4 seconds). Each league has a 20-second request and retry budget, including response-body reads. `Retry-After` is respected only when it fits the remaining budget; longer waits fail without retrying early. Invalid provider responses never replace good cached data. The daily job continues with other leagues, stops starting new work after 12 minutes, and reports failed or unattempted leagues to Sentry; persistent failures are retried on the next scheduled run.
+
+Open, focused dashboards refresh event lists every five minutes. A failed league shows a warning without hiding healthy leagues. Live-score responses are cached for 30 seconds per Cloudflare location, while browser responses remain uncached; missing scores remain unknown rather than displaying zero. The score cache does not merge simultaneous cold-cache requests.
 
 ### 2. Configure production authentication
 
@@ -183,6 +185,8 @@ To disable signup again, write `false` to the same key. Local and remote flags a
 | `pnpm auth:generate`                | Regenerate the Better Auth Drizzle schema                            |
 
 After changing database schemas, generate a migration, inspect the SQL, and apply it locally before deploying it remotely.
+
+Preference writes use `preference_revision` to reject overlapping changes with HTTP `409`; nothing from the stale write is committed. Favourite-team updates use `PATCH /api/favourite-teams` with `{ additions: [{ teamId, leagueId }], removedTeamIds: [] }`, not whole-list replacement. Apply migration `0004_natural_valeria_richards.sql` before deploying this API, and reload older open tabs after deployment.
 
 ## Project layout
 
